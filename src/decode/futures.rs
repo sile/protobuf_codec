@@ -1,5 +1,6 @@
 use std;
 use std::io::{self, Read};
+use byteorder::{ByteOrder, LittleEndian};
 use futures::{Future, Poll, Async};
 use trackable::error::ErrorKindExt;
 
@@ -50,6 +51,42 @@ impl<R: Read> Future for DecodeTagAndWireType<R> {
             };
 
             Ok(Async::Ready((r, (tag, wire_type))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeBool<R>(DecodeVarint<R>);
+impl<R> DecodeBool<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeBool(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeBool<R> {
+    type Item = (R, bool);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, n != 0)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeFixed32<R>(ReadBytes<R, [u8; 4]>);
+impl<R> DecodeFixed32<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeFixed32(ReadBytes::new(reader, [0; 4]))
+    }
+}
+impl<R: Read> Future for DecodeFixed32<R> {
+    type Item = (R, u32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, LittleEndian::read_u32(&bytes[..]))))
         } else {
             Ok(Async::NotReady)
         }
@@ -107,6 +144,7 @@ impl<R: Read> Future for ReadByte<R> {
         match r.read(&mut buf) {
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
+                    self.reader = Some(r);
                     Ok(Async::NotReady)
                 } else {
                     Err(track!(Error::new(r, ErrorKind::Other.cause(e))))
@@ -116,6 +154,50 @@ impl<R: Read> Future for ReadByte<R> {
                 failed!(r, ErrorKind::UnexpectedEos);
             }
             Ok(_) => Ok(Async::Ready((r, buf[0]))),
+        }
+    }
+}
+
+pub struct ReadBytes<R, B> {
+    reader: Option<R>,
+    bytes: Option<B>,
+    offset: usize,
+}
+impl<R, B> ReadBytes<R, B> {
+    pub(crate) fn new(reader: R, bytes: B) -> Self {
+        ReadBytes {
+            reader: Some(reader),
+            bytes: Some(bytes),
+            offset: 0,
+        }
+    }
+}
+impl<R: Read, B: AsMut<[u8]>> Future for ReadBytes<R, B> {
+    type Item = (R, B);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let mut r = self.reader.take().expect("Cannot poll ReadBytes twice");
+        let mut bytes = self.bytes.take().expect("Never fails");
+        loop {
+            match r.read(&mut bytes.as_mut()[self.offset..]) {
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::WouldBlock {
+                        self.reader = Some(r);
+                        self.bytes = Some(bytes);
+                        return Ok(Async::NotReady);
+                    } else {
+                        return Err(track!(Error::new(r, ErrorKind::Other.cause(e))));
+                    }
+                }
+                Ok(read_size) => {
+                    self.offset += read_size;
+                    if self.offset == bytes.as_mut().len() {
+                        return Ok(Async::Ready((r, bytes)));
+                    } else if read_size == 0 {
+                        failed!(r, ErrorKind::UnexpectedEos);
+                    }
+                }
+            }
         }
     }
 }
