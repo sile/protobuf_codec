@@ -7,6 +7,7 @@ use trackable::error::ErrorKind as TrackableErrorKind;
 pub enum ErrorKind {
     Unsupported,
     Invalid,
+    UnexpectedEos,
     Other,
 }
 impl TrackableErrorKind for ErrorKind {}
