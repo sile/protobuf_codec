@@ -1,4 +1,5 @@
 use std;
+use std::io;
 use trackable;
 use trackable::error::TrackableError;
 use trackable::error::ErrorKind as TrackableErrorKind;
@@ -62,5 +63,13 @@ impl<R> trackable::Trackable for Error<R> {
     }
     fn history_mut(&mut self) -> Option<&mut trackable::History<Self::Event>> {
         self.error.history_mut()
+    }
+}
+impl<R> From<Error<io::Take<R>>> for Error<R> {
+    fn from(f: Error<io::Take<R>>) -> Self {
+        Error {
+            reader: f.reader.into_inner(),
+            error: f.error,
+        }
     }
 }

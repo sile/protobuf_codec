@@ -1,11 +1,12 @@
 use std;
 use std::io::{self, Read};
+use std::mem;
 use byteorder::{ByteOrder, LittleEndian};
 use futures::{Future, Poll, Async};
 use trackable::error::ErrorKindExt;
 
 use {Tag, WireType};
-use decode::{Error, ErrorKind};
+use decode::{Error, ErrorKind, Decode};
 
 macro_rules! failed {
     ($reader:expr, $kind:expr) => {
@@ -75,6 +76,132 @@ impl<R: Read> Future for DecodeBool<R> {
     }
 }
 
+pub struct DecodeUint32<R>(DecodeVarint<R>);
+impl<R> DecodeUint32<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeUint32(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeUint32<R> {
+    type Item = (R, u32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            if n > std::u32::MAX as u64 {
+                failed!(r, ErrorKind::Invalid, "Too large `uint32` value: {}", n);
+            }
+            Ok(Async::Ready((r, n as u32)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeUint64<R>(DecodeVarint<R>);
+impl<R> DecodeUint64<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeUint64(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeUint64<R> {
+    type Item = (R, u64);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, n)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeInt32<R>(DecodeVarint<R>);
+impl<R> DecodeInt32<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeInt32(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeInt32<R> {
+    type Item = (R, i32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            let n = n as i64;
+            if n > std::i32::MAX as i64 {
+                failed!(r, ErrorKind::Invalid, "Too large `int32` value: {}", n);
+            }
+            if n < std::i32::MIN as i64 {
+                failed!(r, ErrorKind::Invalid, "Too small `int32` value: {}", n);
+            }
+            Ok(Async::Ready((r, n as i32)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeInt64<R>(DecodeVarint<R>);
+impl<R> DecodeInt64<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeInt64(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeInt64<R> {
+    type Item = (R, i64);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, n as i64)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeSint32<R>(DecodeVarint<R>);
+impl<R> DecodeSint32<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeSint32(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeSint32<R> {
+    type Item = (R, i32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            let n = ((n << 63) | (n >> 1)) as i64;
+            if n > std::i32::MAX as i64 {
+                failed!(r, ErrorKind::Invalid, "Too large `int32` value: {}", n);
+            }
+            if n < std::i32::MIN as i64 {
+                failed!(r, ErrorKind::Invalid, "Too small `int32` value: {}", n);
+            }
+            Ok(Async::Ready((r, n as i32)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeSint64<R>(DecodeVarint<R>);
+impl<R> DecodeSint64<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeSint64(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeSint64<R> {
+    type Item = (R, i64);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            let n = ((n << 63) | (n >> 1)) as i64;
+            Ok(Async::Ready((r, n)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
 pub struct DecodeFixed32<R>(ReadBytes<R, [u8; 4]>);
 impl<R> DecodeFixed32<R> {
     pub(crate) fn new(reader: R) -> Self {
@@ -90,6 +217,259 @@ impl<R: Read> Future for DecodeFixed32<R> {
         } else {
             Ok(Async::NotReady)
         }
+    }
+}
+
+pub struct DecodeSfixed32<R>(ReadBytes<R, [u8; 4]>);
+impl<R> DecodeSfixed32<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeSfixed32(ReadBytes::new(reader, [0; 4]))
+    }
+}
+impl<R: Read> Future for DecodeSfixed32<R> {
+    type Item = (R, i32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, LittleEndian::read_i32(&bytes[..]))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeFloat<R>(ReadBytes<R, [u8; 4]>);
+impl<R> DecodeFloat<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeFloat(ReadBytes::new(reader, [0; 4]))
+    }
+}
+impl<R: Read> Future for DecodeFloat<R> {
+    type Item = (R, f32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, LittleEndian::read_f32(&bytes[..]))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeFixed64<R>(ReadBytes<R, [u8; 8]>);
+impl<R> DecodeFixed64<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeFixed64(ReadBytes::new(reader, [0; 8]))
+    }
+}
+impl<R: Read> Future for DecodeFixed64<R> {
+    type Item = (R, u64);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, LittleEndian::read_u64(&bytes[..]))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeSfixed64<R>(ReadBytes<R, [u8; 8]>);
+impl<R> DecodeSfixed64<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeSfixed64(ReadBytes::new(reader, [0; 8]))
+    }
+}
+impl<R: Read> Future for DecodeSfixed64<R> {
+    type Item = (R, i64);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, LittleEndian::read_i64(&bytes[..]))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeDouble<R>(ReadBytes<R, [u8; 8]>);
+impl<R> DecodeDouble<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeDouble(ReadBytes::new(reader, [0; 8]))
+    }
+}
+impl<R: Read> Future for DecodeDouble<R> {
+    type Item = (R, f64);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, LittleEndian::read_f64(&bytes[..]))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodeBytes<R>(DecodeBytesInner<R>);
+impl<R> DecodeBytes<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeBytes(DecodeBytesInner::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeBytes<R> {
+    type Item = (R, Vec<u8>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            Ok(Async::Ready((r, bytes)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+enum DecodeBytesInner<R> {
+    Length(DecodeVarint<R>),
+    Bytes(ReadBytes<R, Vec<u8>>),
+}
+impl<R> DecodeBytesInner<R> {
+    pub fn new(reader: R) -> Self {
+        DecodeBytesInner::Length(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeBytesInner<R> {
+    type Item = (R, Vec<u8>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        loop {
+            let next = match *self {
+                DecodeBytesInner::Length(ref mut f) => {
+                    if let Async::Ready((r, len)) = track!(f.poll())? {
+                        if len > std::usize::MAX as u64 {
+                            failed!(r, ErrorKind::Invalid, "Too large bytes length: {}", len);
+                        }
+                        DecodeBytesInner::Bytes(ReadBytes::new(r, vec![0; len as usize]))
+                    } else {
+                        break;
+                    }
+                }
+                DecodeBytesInner::Bytes(ref mut f) => {
+                    return track!(f.poll());
+                }
+            };
+            *self = next;
+        }
+        Ok(Async::NotReady)
+    }
+}
+
+pub struct DecodeUtf8<R>(DecodeBytes<R>);
+impl<R> DecodeUtf8<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodeUtf8(DecodeBytes::new(reader))
+    }
+}
+impl<R: Read> Future for DecodeUtf8<R> {
+    type Item = (R, String);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, bytes)) = track!(self.0.poll())? {
+            match String::from_utf8(bytes) {
+                Err(e) => Err(track!(Error::new(r, ErrorKind::Invalid.cause(e)))),
+                Ok(s) => Ok(Async::Ready((r, s))),
+            }
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+pub struct DecodePacked<R, T>(DecodePackedInner<R, T>)
+where
+    R: Read,
+    T: Decode<io::Take<R>>;
+impl<R: Read, T: Decode<io::Take<R>>> DecodePacked<R, T> {
+    pub(crate) fn new(reader: R) -> Self {
+        DecodePacked(DecodePackedInner::new(reader))
+    }
+}
+impl<R: Read, T: Decode<io::Take<R>>> Future for DecodePacked<R, T> {
+    type Item = (R, Vec<T::Value>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        track!(self.0.poll())
+    }
+}
+
+enum DecodePackedInner<R, T>
+where
+    R: Read,
+    T: Decode<io::Take<R>>,
+{
+    Length(DecodeVarint<R>),
+    Fields(DecodePackedFields<R, T>),
+}
+impl<R: Read, T: Decode<io::Take<R>>> DecodePackedInner<R, T> {
+    pub fn new(reader: R) -> Self {
+        DecodePackedInner::Length(DecodeVarint::new(reader))
+    }
+}
+impl<R: Read, T: Decode<io::Take<R>>> Future for DecodePackedInner<R, T> {
+    type Item = (R, Vec<T::Value>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        loop {
+            let next = match *self {
+                DecodePackedInner::Length(ref mut f) => {
+                    if let Async::Ready((r, len)) = track!(f.poll())? {
+                        if len == 0 {
+                            return Ok(Async::Ready((r, Vec::new())));
+                        } else {
+                            DecodePackedInner::Fields(DecodePackedFields::new(r.take(len)))
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                DecodePackedInner::Fields(ref mut f) => {
+                    return track!(f.poll());
+                }
+            };
+            *self = next;
+        }
+        Ok(Async::NotReady)
+    }
+}
+
+struct DecodePackedFields<R, T>
+where
+    R: Read,
+    T: Decode<io::Take<R>>,
+{
+    future: T::Future,
+    fields: Vec<T::Value>,
+}
+impl<R: Read, T: Decode<io::Take<R>>> DecodePackedFields<R, T> {
+    pub fn new(reader: io::Take<R>) -> Self {
+        DecodePackedFields {
+            future: T::decode(reader),
+            fields: Vec::new(),
+        }
+    }
+}
+impl<R: Read, T: Decode<io::Take<R>>> Future for DecodePackedFields<R, T> {
+    type Item = (R, Vec<T::Value>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        while let Async::Ready((r, field)) = track!(self.future.poll())? {
+            self.fields.push(field);
+            if r.limit() == 0 {
+                let item = (r.into_inner(), mem::replace(&mut self.fields, Vec::new()));
+                return Ok(Async::Ready(item));
+            }
+            self.future = T::decode(r);
+        }
+        Ok(Async::NotReady)
     }
 }
 
@@ -158,13 +538,13 @@ impl<R: Read> Future for ReadByte<R> {
     }
 }
 
-pub struct ReadBytes<R, B> {
+struct ReadBytes<R, B> {
     reader: Option<R>,
     bytes: Option<B>,
     offset: usize,
 }
 impl<R, B> ReadBytes<R, B> {
-    pub(crate) fn new(reader: R, bytes: B) -> Self {
+    pub fn new(reader: R, bytes: B) -> Self {
         ReadBytes {
             reader: Some(reader),
             bytes: Some(bytes),
