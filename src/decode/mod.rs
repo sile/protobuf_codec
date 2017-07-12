@@ -11,5 +11,5 @@ mod error;
 pub trait Decode<R: Read> {
     type Value;
     type Future: Future<Item = (R, Self::Value), Error = Error<R>>;
-    fn decode(reader: R) -> Self::Future;
+    fn decode(&self, reader: R) -> Self::Future;
 }

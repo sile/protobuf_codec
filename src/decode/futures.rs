@@ -389,11 +389,11 @@ where
     R: Read,
     T: Decode<io::Take<R>>;
 impl<R: Read, T: Decode<io::Take<R>>> DecodePacked<R, T> {
-    pub(crate) fn new(reader: R) -> Self {
-        DecodePacked(DecodePackedInner::new(reader))
+    pub(crate) fn new(decoder: T, reader: R) -> Self {
+        DecodePacked(DecodePackedInner::new(decoder, reader))
     }
 }
-impl<R: Read, T: Decode<io::Take<R>>> Future for DecodePacked<R, T> {
+impl<R: Read, T: Clone + Decode<io::Take<R>>> Future for DecodePacked<R, T> {
     type Item = (R, Vec<T::Value>);
     type Error = Error<R>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -406,26 +406,28 @@ where
     R: Read,
     T: Decode<io::Take<R>>,
 {
-    Length(DecodeVarint<R>),
+    Length(T, DecodeVarint<R>),
     Fields(DecodePackedFields<R, T>),
 }
 impl<R: Read, T: Decode<io::Take<R>>> DecodePackedInner<R, T> {
-    pub fn new(reader: R) -> Self {
-        DecodePackedInner::Length(DecodeVarint::new(reader))
+    pub fn new(decoder: T, reader: R) -> Self {
+        DecodePackedInner::Length(decoder, DecodeVarint::new(reader))
     }
 }
-impl<R: Read, T: Decode<io::Take<R>>> Future for DecodePackedInner<R, T> {
+impl<R: Read, T: Clone + Decode<io::Take<R>>> Future for DecodePackedInner<R, T> {
     type Item = (R, Vec<T::Value>);
     type Error = Error<R>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             let next = match *self {
-                DecodePackedInner::Length(ref mut f) => {
+                DecodePackedInner::Length(ref decoder, ref mut f) => {
                     if let Async::Ready((r, len)) = track!(f.poll())? {
                         if len == 0 {
                             return Ok(Async::Ready((r, Vec::new())));
                         } else {
-                            DecodePackedInner::Fields(DecodePackedFields::new(r.take(len)))
+                            DecodePackedInner::Fields(
+                                DecodePackedFields::new(decoder.clone(), r.take(len)),
+                            )
                         }
                     } else {
                         break;
@@ -447,12 +449,14 @@ where
     T: Decode<io::Take<R>>,
 {
     future: T::Future,
+    decoder: T,
     fields: Vec<T::Value>,
 }
 impl<R: Read, T: Decode<io::Take<R>>> DecodePackedFields<R, T> {
-    pub fn new(reader: io::Take<R>) -> Self {
+    pub fn new(decoder: T, reader: io::Take<R>) -> Self {
         DecodePackedFields {
-            future: T::decode(reader),
+            future: decoder.decode(reader),
+            decoder,
             fields: Vec::new(),
         }
     }
@@ -467,7 +471,7 @@ impl<R: Read, T: Decode<io::Take<R>>> Future for DecodePackedFields<R, T> {
                 let item = (r.into_inner(), mem::replace(&mut self.fields, Vec::new()));
                 return Ok(Async::Ready(item));
             }
-            self.future = T::decode(r);
+            self.future = self.decoder.decode(r);
         }
         Ok(Async::NotReady)
     }
