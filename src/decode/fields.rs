@@ -96,4 +96,10 @@ where
 pub enum Variant2<A, B> {
     A(A),
     B(B),
+    None,
+}
+impl<A, B> Default for Variant2<A, B> {
+    fn default() -> Self {
+        Variant2::None
+    }
 }

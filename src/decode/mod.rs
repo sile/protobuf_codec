@@ -18,7 +18,7 @@ pub trait Decode<R: Read> {
 }
 
 pub trait FieldDecode<R: Read> {
-    type Value;
+    type Value: Default;
     type Future: Future<Item = (R, Self::Value), Error = Error<R>>;
     fn field_decode(
         &self,

@@ -1,6 +1,6 @@
 use std::io::{self, Read};
 
-use decode::Decode;
+use decode::{Decode, FieldDecode};
 use decode::futures;
 
 #[derive(Debug, Clone, Copy)]
@@ -162,6 +162,24 @@ impl<R: Read, T: Clone + Decode<io::Take<R>>> Decode<R> for Packed<T> {
         futures::DecodePacked::new(self.0.clone(), reader)
     }
 }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct Message2<F0, F1> {
+//     pub name: &'static str,
+//     pub field0: F0,
+//     pub field1: F1,
+// }
+// impl<R: Read> Decode<R> for Message2<F0, F1>
+// where
+//     F0: FieldDecode<R>,
+//     F1: FieldDecode<R>,
+// {
+//     type Value = (F0::Value, F1::Value);
+//     type Future = futures::DecodeMessage2<R, F0, F1>;
+//     fn decode(&self, reader: R) -> Self::Future {
+//         futures::DecodeMessage2::new(self, reader)
+//     }
+// }
 
 #[cfg(test)]
 mod test {
