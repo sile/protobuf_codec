@@ -6,7 +6,8 @@ use futures::{Future, Poll, Async};
 use trackable::error::ErrorKindExt;
 
 use {Tag, WireType};
-use decode::{Error, ErrorKind, Decode};
+use decode::{Error, ErrorKind, Decode, FieldDecode};
+use decode::fields;
 
 macro_rules! failed {
     ($reader:expr, $kind:expr) => {
@@ -17,7 +18,9 @@ macro_rules! failed {
     }
 }
 
-pub struct DecodeTagAndWireType<R>(DecodeVarint<R>);
+#[allow(dead_code)]
+pub(crate) struct DecodeTagAndWireType<R>(DecodeVarint<R>);
+#[allow(dead_code)]
 impl<R> DecodeTagAndWireType<R> {
     pub(crate) fn new(reader: R) -> Self {
         DecodeTagAndWireType(DecodeVarint::new(reader))
@@ -583,5 +586,33 @@ impl<R: Read, B: AsMut<[u8]>> Future for ReadBytes<R, B> {
                 }
             }
         }
+    }
+}
+
+pub enum DecodeVariant2<R, A, B>
+where
+    R: Read,
+    A: FieldDecode<R>,
+    B: FieldDecode<R>,
+{
+    A(A::Future),
+    B(B::Future),
+}
+impl<R: Read, A, B> Future for DecodeVariant2<R, A, B>
+where
+    A: FieldDecode<R>,
+    B: FieldDecode<R>,
+{
+    type Item = (R, fields::Variant2<A::Value, B::Value>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(match *self {
+            DecodeVariant2::A(ref mut f) => {
+                track!(f.poll())?.map(|(r, v)| (r, fields::Variant2::A(v)))
+            }
+            DecodeVariant2::B(ref mut f) => {
+                track!(f.poll())?.map(|(r, v)| (r, fields::Variant2::B(v)))
+            }
+        })
     }
 }

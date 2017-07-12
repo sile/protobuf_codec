@@ -1,17 +1,7 @@
 use std::io::{self, Read};
 
-use {Tag, WireType};
 use decode::Decode;
 use decode::futures;
-
-pub struct TagAndWireType;
-impl<R: Read> Decode<R> for TagAndWireType {
-    type Value = (Tag, WireType);
-    type Future = futures::DecodeTagAndWireType<R>;
-    fn decode(&self, reader: R) -> Self::Future {
-        futures::DecodeTagAndWireType::new(reader)
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Bool;
@@ -172,15 +162,6 @@ impl<R: Read, T: Clone + Decode<io::Take<R>>> Decode<R> for Packed<T> {
         futures::DecodePacked::new(self.0.clone(), reader)
     }
 }
-
-// #[derive(Debug, Clone, Copy)]
-// pub struct Field<T> {
-//     pub tag: Tag,
-//     pub field: T,
-// }
-
-// #[derive(Debug, Clone, Copy)]
-// pub struct Oneof
 
 #[cfg(test)]
 mod test {
