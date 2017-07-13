@@ -34,6 +34,7 @@ mod composites;
 mod error;
 mod fields;
 mod scalars;
+mod variants;
 mod wires;
 
 pub trait Decode<R: Read>: Type {
@@ -46,32 +47,32 @@ pub trait DecodePayload<R: Read>: Payload {
     fn decode_payload(self, reader: Take<R>) -> Self::Future;
 }
 
-pub trait FieldDecode<R: Read>: Field {
+pub trait DecodeField<R: Read>: Field {
     type Future: Future<Item = (R, Self::Value), Error = DecodeError<R>>;
-    fn field_decode(
-        &self,
+    fn decode_field(
+        self,
         reader: R,
         tag: Tag,
         wire_type: WireType,
         acc: Self::Value,
-    ) -> FieldDecodeResult<Self::Future, R>;
+    ) -> DecodeFieldResult<Self::Future, R>;
 }
 
 #[derive(Debug)]
-pub enum FieldDecodeResult<T, R> {
+pub enum DecodeFieldResult<T, R> {
     Ok(T),
     Err(DecodeError<R>),
     NotTarget(R),
 }
-impl<T, R> FieldDecodeResult<T, R> {
-    pub fn map<F, U>(self, f: F) -> FieldDecodeResult<U, R>
+impl<T, R> DecodeFieldResult<T, R> {
+    pub fn map<F, U>(self, f: F) -> DecodeFieldResult<U, R>
     where
         F: FnOnce(T) -> U,
     {
         match self {
-            FieldDecodeResult::Ok(v) => FieldDecodeResult::Ok(f(v)),
-            FieldDecodeResult::Err(e) => FieldDecodeResult::Err(e),
-            FieldDecodeResult::NotTarget(r) => FieldDecodeResult::NotTarget(r),
+            DecodeFieldResult::Ok(v) => DecodeFieldResult::Ok(f(v)),
+            DecodeFieldResult::Err(e) => DecodeFieldResult::Err(e),
+            DecodeFieldResult::NotTarget(r) => DecodeFieldResult::NotTarget(r),
         }
     }
 }

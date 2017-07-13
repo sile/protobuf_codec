@@ -34,9 +34,15 @@ impl<T: Type> Field for PackedRepeated<T> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ReservedTag(pub Tag);
+impl Field for ReservedTag {
+    type Value = ();
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct ReservedName(&'static str);
+impl Field for ReservedName {
+    type Value = ();
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Oneof<T> {

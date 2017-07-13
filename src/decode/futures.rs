@@ -6,6 +6,7 @@ pub use super::composites::DecodePacked;
 pub use super::scalars::{DecodeBool, DecodeUint32, DecodeInt32, DecodeInt64, DecodeSint32,
                          DecodeSint64, DecodeFixed32, DecodeFixed64, DecodeSfixed32,
                          DecodeSfixed64, DecodeFloat, DecodeDouble, DecodeBytes, DecodeStr};
+pub use super::variants::DecodeVariant2;
 pub use super::wires::{DecodeVarint, DecodeLengthDelimited};
 
 use ErrorKind;
@@ -57,16 +58,16 @@ use decode::DecodeError;
 // pub enum DecodeVariant2<R, A, B>
 // where
 //     R: Read,
-//     A: FieldDecode<R>,
-//     B: FieldDecode<R>,
+//     A: DecodeField<R>,
+//     B: DecodeField<R>,
 // {
 //     A(A::Future),
 //     B(B::Future),
 // }
 // impl<R: Read, A, B> Future for DecodeVariant2<R, A, B>
 // where
-//     A: FieldDecode<R>,
-//     B: FieldDecode<R>,
+//     A: DecodeField<R>,
+//     B: DecodeField<R>,
 // {
 //     type Item = (R, fields::Variant2<A::Value, B::Value>);
 //     type Error = Error<R>;
@@ -81,6 +82,49 @@ use decode::DecodeError;
 //         })
 //     }
 // }
+
+#[derive(Debug)]
+pub struct Push<R, F, T>
+where
+    F: Future<Item = (R, T), Error = DecodeError<R>>,
+{
+    future: F,
+    vec: Vec<T>,
+}
+impl<R, F, T> Push<R, F, T>
+where
+    F: Future<Item = (R, T), Error = DecodeError<R>>,
+{
+    pub fn new(future: F, vec: Vec<T>) -> Self {
+        Push { future, vec }
+    }
+}
+impl<R, F, T> Future for Push<R, F, T>
+where
+    F: Future<Item = (R, T), Error = DecodeError<R>>,
+{
+    type Item = (R, Vec<T>);
+    type Error = F::Error;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, v)) = track!(self.future.poll())? {
+            self.vec.push(v);
+            let vec = mem::replace(&mut self.vec, Vec::new());
+            Ok(Async::Ready((r, vec)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Unused<R, T>(R, T);
+impl<R, T> Future for Unused<R, T> {
+    type Item = (R, T);
+    type Error = DecodeError<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        unreachable!()
+    }
+}
 
 #[derive(Debug)]
 pub struct ReadByte<R> {
