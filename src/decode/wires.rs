@@ -1,11 +1,10 @@
 use std::io::Read;
 use futures::{Future, Poll, Async};
-use trackable::Trackable;
 
 use ErrorKind;
 use wires;
 use decode::{Decode, DecodePayload, DecodeError};
-use decode::futures::{ReadByte, ReadBytes};
+use decode::futures::{ReadByte, ReadBytes, Phase2};
 
 impl<R: Read> Decode<R> for wires::Bit32 {
     type Future = ReadBytes<R, [u8; 4]>;
@@ -102,27 +101,5 @@ where
         let phase = Phase2::A(wires::Varint.decode(reader));
         let value = Some(self.0);
         DecodeLengthDelimited { phase, value }
-    }
-}
-
-#[derive(Debug)]
-enum Phase2<A, B> {
-    A(A),
-    B(B),
-}
-impl<A, B> Future for Phase2<A, B>
-where
-    A: Future,
-    B: Future,
-    A::Error: Trackable + From<B::Error>,
-    B::Error: Trackable,
-{
-    type Item = Phase2<A::Item, B::Item>;
-    type Error = A::Error;
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(match *self {
-            Phase2::A(ref mut f) => track!(f.poll())?.map(Phase2::A),
-            Phase2::B(ref mut f) => track!(f.poll().map_err(From::from))?.map(Phase2::B),
-        })
     }
 }

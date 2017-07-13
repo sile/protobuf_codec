@@ -33,6 +33,12 @@ impl<T: Type> Field for PackedRepeated<T> {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Ignore;
+impl Field for Ignore {
+    type Value = ();
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct ReservedTag(pub Tag);
 impl Field for ReservedTag {
     type Value = ();

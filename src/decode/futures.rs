@@ -1,87 +1,140 @@
+use std;
 use std::io::{self, Read};
 use std::mem;
 use futures::{Future, Poll, Async};
+use trackable::Trackable;
 
-pub use super::composites::DecodePacked;
+pub use super::composites::{DecodePacked, DecodeMessage2};
 pub use super::scalars::{DecodeBool, DecodeUint32, DecodeInt32, DecodeInt64, DecodeSint32,
                          DecodeSint64, DecodeFixed32, DecodeFixed64, DecodeSfixed32,
                          DecodeSfixed64, DecodeFloat, DecodeDouble, DecodeBytes, DecodeStr};
-pub use super::variants::DecodeVariant2;
+pub use super::variants::{DecodeVariant2, DecodeVariant3};
 pub use super::wires::{DecodeVarint, DecodeLengthDelimited};
 
-use ErrorKind;
-use decode::DecodeError;
+use {Tag, WireType, ErrorKind};
+use decode::{Decode, DecodeError};
+use scalars;
+use wires::Varint;
 
-// #[allow(dead_code)]
-// pub(crate) struct DecodeTagAndWireType<R>(DecodeVarint<R>);
-// #[allow(dead_code)]
-// impl<R> DecodeTagAndWireType<R> {
-//     pub(crate) fn new(reader: R) -> Self {
-//         DecodeTagAndWireType(DecodeVarint::new(reader))
-//     }
-// }
-// impl<R: Read> Future for DecodeTagAndWireType<R> {
-//     type Item = (R, (Tag, WireType));
-//     type Error = Error<R>;
-//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//         if let Async::Ready((r, n)) = track!(self.0.poll())? {
-//             let tag = n >> 3;
-//             if tag > std::u32::MAX as u64 {
-//                 failed!(r, ErrorKind::Invalid, "Too large tag value: {}", tag);
-//             }
-//             let tag = Tag(tag as u32);
+// TODO: optimize
+#[derive(Debug)]
+pub enum Ignore<R: Read> {
+    Varint(DecodeVarint<R>),
+    Bit32(ReadBytes<R, [u8; 4]>),
+    Bit64(ReadBytes<R, [u8; 8]>),
+    Bytes(DecodeBytes<R>),
+}
+impl<R: Read> Ignore<R> {
+    pub fn new(reader: R, wire_type: WireType) -> Self {
+        match wire_type {
+            WireType::Varint => Ignore::Varint(Varint.decode(reader)),
+            WireType::Bit32 => Ignore::Bit32(ReadBytes::new(reader, [0; 4])),
+            WireType::Bit64 => Ignore::Bit64(ReadBytes::new(reader, [0; 8])),
+            WireType::LengthDelimited => Ignore::Bytes(scalars::Bytes.decode(reader)),
+        }
+    }
+}
+impl<R: Read> Future for Ignore<R> {
+    type Item = (R, ());
+    type Error = DecodeError<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(match *self {
+            Ignore::Varint(ref mut f) => track!(f.poll())?.map(|(r, _)| (r, ())),
+            Ignore::Bit32(ref mut f) => track!(f.poll())?.map(|(r, _)| (r, ())),
+            Ignore::Bit64(ref mut f) => track!(f.poll())?.map(|(r, _)| (r, ())),
+            Ignore::Bytes(ref mut f) => track!(f.poll())?.map(|(r, _)| (r, ())),
+        })
+    }
+}
 
-//             let wire_type = n & 0b111;
-//             let wire_type = match wire_type {
-//                 0 => WireType::Varint,
-//                 1 => WireType::Bit64,
-//                 2 => WireType::LengthDelimited,
-//                 3 | 4 => {
-//                     failed!(
-//                         r,
-//                         ErrorKind::Unsupported,
-//                         "Unsupported wire type: {}",
-//                         wire_type
-//                     )
-//                 }
-//                 5 => WireType::Bit32,
-//                 _ => failed!(r, ErrorKind::Invalid, "Unknown wire type: {}", wire_type),
-//             };
+#[derive(Debug)]
+pub enum Phase2<A, B> {
+    A(A),
+    B(B),
+}
+impl<A, B> Future for Phase2<A, B>
+where
+    A: Future,
+    B: Future,
+    A::Error: Trackable + From<B::Error>,
+    B::Error: Trackable,
+{
+    type Item = Phase2<A::Item, B::Item>;
+    type Error = A::Error;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(match *self {
+            Phase2::A(ref mut f) => track!(f.poll())?.map(Phase2::A),
+            Phase2::B(ref mut f) => track!(f.poll().map_err(From::from))?.map(Phase2::B),
+        })
+    }
+}
 
-//             Ok(Async::Ready((r, (tag, wire_type))))
-//         } else {
-//             Ok(Async::NotReady)
-//         }
-//     }
-// }
+#[derive(Debug)]
+pub enum Phase3<A, B, C> {
+    A(A),
+    B(B),
+    C(C),
+}
+impl<A, B, C> Future for Phase3<A, B, C>
+where
+    A: Future,
+    B: Future,
+    C: Future,
+    A::Error: Trackable + From<B::Error> + From<C::Error>,
+    B::Error: Trackable,
+    C::Error: Trackable,
+{
+    type Item = Phase3<A::Item, B::Item, C::Item>;
+    type Error = A::Error;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(match *self {
+            Phase3::A(ref mut f) => track!(f.poll())?.map(Phase3::A),
+            Phase3::B(ref mut f) => track!(f.poll().map_err(A::Error::from))?.map(Phase3::B),
+            Phase3::C(ref mut f) => track!(f.poll().map_err(A::Error::from))?.map(Phase3::C),
+        })
+    }
+}
 
-// pub enum DecodeVariant2<R, A, B>
-// where
-//     R: Read,
-//     A: DecodeField<R>,
-//     B: DecodeField<R>,
-// {
-//     A(A::Future),
-//     B(B::Future),
-// }
-// impl<R: Read, A, B> Future for DecodeVariant2<R, A, B>
-// where
-//     A: DecodeField<R>,
-//     B: DecodeField<R>,
-// {
-//     type Item = (R, fields::Variant2<A::Value, B::Value>);
-//     type Error = Error<R>;
-//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//         Ok(match *self {
-//             DecodeVariant2::A(ref mut f) => {
-//                 track!(f.poll())?.map(|(r, v)| (r, fields::Variant2::A(v)))
-//             }
-//             DecodeVariant2::B(ref mut f) => {
-//                 track!(f.poll())?.map(|(r, v)| (r, fields::Variant2::B(v)))
-//             }
-//         })
-//     }
-// }
+pub struct DecodeTagAndWireType<R>(DecodeVarint<R>);
+impl<R: Read> DecodeTagAndWireType<R> {
+    pub fn new(reader: R) -> Self {
+        DecodeTagAndWireType(Varint.decode(reader))
+    }
+}
+impl<R: Read> Future for DecodeTagAndWireType<R> {
+    type Item = (R, (Tag, WireType));
+    type Error = DecodeError<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            let tag = n >> 3;
+            if tag > std::u32::MAX as u64 {
+                failed!(r, ErrorKind::Invalid, "Too large tag value: {}", tag);
+            }
+            let tag = Tag(tag as u32);
+
+            let wire_type = n & 0b111;
+            let wire_type = match wire_type {
+                0 => WireType::Varint,
+                1 => WireType::Bit64,
+                2 => WireType::LengthDelimited,
+                3 | 4 => {
+                    failed!(
+                        r,
+                        ErrorKind::Unsupported,
+                        "Unsupported wire type: {}",
+                        wire_type
+                    )
+                }
+                5 => WireType::Bit32,
+                _ => failed!(r, ErrorKind::Invalid, "Unknown wire type: {}", wire_type),
+            };
+
+            Ok(Async::Ready((r, (tag, wire_type))))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Push<R, F, T>

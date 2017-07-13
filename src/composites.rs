@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use {Type, Field, WireType};
+use {Type, Field, Payload, WireType};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Enum;
@@ -58,4 +58,7 @@ impl<A: Field, B: Field, C: Field> Type for Message<(A, B, C)> {
     fn wire_type() -> WireType {
         WireType::LengthDelimited
     }
+}
+impl<A: Field, B: Field> Payload for Message<(A, B)> {
+    type Value = (A::Value, B::Value);
 }

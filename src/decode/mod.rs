@@ -55,24 +55,24 @@ pub trait DecodeField<R: Read>: Field {
         tag: Tag,
         wire_type: WireType,
         acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R>;
+    ) -> DecodeFieldResult<Self::Future, R, Self::Value>;
 }
 
 #[derive(Debug)]
-pub enum DecodeFieldResult<T, R> {
+pub enum DecodeFieldResult<T, R, S> {
     Ok(T),
     Err(DecodeError<R>),
-    NotTarget(R),
+    NotTarget(R, S),
 }
-impl<T, R> DecodeFieldResult<T, R> {
-    pub fn map<F, U>(self, f: F) -> DecodeFieldResult<U, R>
+impl<T, R, S> DecodeFieldResult<T, R, S> {
+    pub fn map<F, U>(self, f: F) -> DecodeFieldResult<U, R, S>
     where
         F: FnOnce(T) -> U,
     {
         match self {
             DecodeFieldResult::Ok(v) => DecodeFieldResult::Ok(f(v)),
             DecodeFieldResult::Err(e) => DecodeFieldResult::Err(e),
-            DecodeFieldResult::NotTarget(r) => DecodeFieldResult::NotTarget(r),
+            DecodeFieldResult::NotTarget(r, s) => DecodeFieldResult::NotTarget(r, s),
         }
     }
 }
