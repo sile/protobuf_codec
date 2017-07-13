@@ -75,4 +75,11 @@ impl<T, R, S> DecodeFieldResult<T, R, S> {
             DecodeFieldResult::NotTarget(r, s) => DecodeFieldResult::NotTarget(r, s),
         }
     }
+    pub fn unwrap(self) -> T {
+        if let DecodeFieldResult::Ok(v) = self {
+            v
+        } else {
+            panic!()
+        }
+    }
 }

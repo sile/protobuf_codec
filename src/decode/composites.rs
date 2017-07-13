@@ -8,7 +8,7 @@ use composites::{Packed, Enum, Message};
 use fields;
 use variants::Variant3;
 use wires::{Varint, LengthDelimited};
-use super::{Decode, DecodePayload, DecodeError, DecodeField};
+use super::{Decode, DecodePayload, DecodeError, DecodeField, DecodeFieldResult};
 use super::futures::{DecodeLengthDelimited, DecodeVarint, Phase2, DecodeTagAndWireType,
                      DecodeVariant3};
 
@@ -110,6 +110,22 @@ where
     }
 }
 
+macro_rules! try_decode_field {
+    ($f:expr, $r:expr, $t:expr, $w:expr, $a:expr, $v:expr) => {
+        {
+            let acc = $a.take().expect("Never fails");
+            match $f.clone().decode_field($r, $t, $w, acc) {
+                DecodeFieldResult::Err(e) => return Err(track!(e)),
+                DecodeFieldResult::Ok(v) => return Ok($v(v)),
+                DecodeFieldResult::NotTarget(r, s) => {
+                    $a = Some(s);
+                    r
+                }
+            }
+        }
+    }
+}
+
 pub struct DecodeMessage2<R, A, B>
 where
     R: Read,
@@ -124,8 +140,8 @@ where
 impl<R, A, B> DecodeMessage2<R, A, B>
 where
     R: Read,
-    A: DecodeField<Take<R>>,
-    B: DecodeField<Take<R>>,
+    A: DecodeField<Take<R>> + Clone,
+    B: DecodeField<Take<R>> + Clone,
 {
     pub fn new(message: Message<(A, B)>, reader: Take<R>) -> Self {
         let phase = if reader.limit() > 0 {
@@ -141,26 +157,47 @@ where
         }
     }
     fn decode_field(
-        &self,
+        &mut self,
         reader: Take<R>,
         tag: Tag,
         wire_type: WireType,
-    ) -> DecodeVariant3<Take<R>, A, B, fields::Ignore> {
-        panic!()
+    ) -> Result<DecodeVariant3<Take<R>, A, B, fields::Ignore>, DecodeError<Take<R>>> {
+        let reader = try_decode_field!(
+            self.message.fields.0,
+            reader,
+            tag,
+            wire_type,
+            self.value0,
+            DecodeVariant3::A
+        );
+        let reader = try_decode_field!(
+            self.message.fields.1,
+            reader,
+            tag,
+            wire_type,
+            self.value1,
+            DecodeVariant3::B
+        );
+        let ignore = fields::Ignore
+            .decode_field(reader, tag, wire_type, ())
+            .unwrap();
+        Ok(DecodeVariant3::C(ignore))
     }
 }
 impl<R, A, B> Future for DecodeMessage2<R, A, B>
 where
     R: Read,
-    A: DecodeField<Take<R>>,
-    B: DecodeField<Take<R>>,
+    A: DecodeField<Take<R>> + Clone,
+    B: DecodeField<Take<R>> + Clone,
 {
     type Item = (Take<R>, (A::Value, B::Value));
     type Error = DecodeError<Take<R>>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         while let Async::Ready(phase) = track!(self.phase.poll())? {
             let next = match phase {
-                Phase2::A((r, (tag, wire_type))) => Phase2::B(self.decode_field(r, tag, wire_type)),
+                Phase2::A((r, (tag, wire_type))) => Phase2::B(
+                    track!(self.decode_field(r, tag, wire_type))?,
+                ),
                 Phase2::B((r, variant)) => {
                     match variant {
                         Variant3::A(v0) => self.value0 = Some(v0),
@@ -185,8 +222,8 @@ where
 impl<R, A, B> Decode<R> for Message<(A, B)>
 where
     R: Read,
-    A: DecodeField<Take<R>>,
-    B: DecodeField<Take<R>>,
+    A: DecodeField<Take<R>> + Clone,
+    B: DecodeField<Take<R>> + Clone,
 {
     type Future = DecodeLengthDelimited<R, Message<(A, B)>>;
     fn decode(self, reader: R) -> Self::Future {
@@ -196,11 +233,45 @@ where
 impl<R, A, B> DecodePayload<R> for Message<(A, B)>
 where
     R: Read,
-    A: DecodeField<Take<R>>,
-    B: DecodeField<Take<R>>,
+    A: DecodeField<Take<R>> + Clone,
+    B: DecodeField<Take<R>> + Clone,
 {
     type Future = DecodeMessage2<R, A, B>;
     fn decode_payload(self, reader: Take<R>) -> Self::Future {
         DecodeMessage2::new(self, reader)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::io::Read;
+    use futures::Future;
+
+    use Tag;
+    use composites::Message;
+    use decode::DecodePayload;
+    use fields::Singular;
+    use scalars::Int32;
+
+    #[test]
+    fn it_works() {
+        let bytes = [0x08, 0x96, 0x01, 0x10, 0x96, 0x01];
+        let m = Message {
+            name: "Test",
+            fields: (
+                Singular {
+                    name: "a",
+                    tag: Tag(1),
+                    value: Int32,
+                },
+                Singular {
+                    name: "b",
+                    tag: Tag(2),
+                    value: Int32,
+                },
+            ),
+        };
+        let (_, v) = track_try_unwrap!(m.decode_payload((&bytes[..]).take(6)).wait());
+        assert_eq!(v, (150, 150));
     }
 }
