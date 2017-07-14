@@ -1,142 +1,198 @@
 use std::io::{Read, Take};
-use trackable::error::ErrorKindExt;
+use std::marker::PhantomData;
+use std::mem;
+use futures::{self, Future, Poll, Async};
+use futures::future::Either;
 
-use {Tag, WireType, ErrorKind};
-use decode::{Decode, DecodeError, DecodeField, DecodeFieldResult};
-use decode::futures::{self, Unused, Push, DecodeVariant2, Ignore};
-use fields::{self, Singular};
+use Error;
+use fields;
+use traits::{Tag, Type, SingularField};
+use util_futures::Finished;
+use variants::Variant2;
+use wire::WireType;
+use super::{Decode, DecodeField};
+use super::futures::{VecPush, DecodeLengthDelimited};
 
-macro_rules! check_tag {
-    ($reader:expr, $acc:expr, $actual:expr, $expected:expr) => {
-        if $actual != $expected {
-            return DecodeFieldResult::NotTarget($reader, $acc);
-        }
-    }
-}
-macro_rules! assert_wire_type {
+macro_rules! track_assert_wire_type {
     ($reader:expr, $actual:expr, $expected:expr) => {
         if $actual != $expected {
+            use trackable::error::ErrorKindExt;
             let cause = format!("Unexpected wire type: actual={:?}, expected={:?}",
                                 $actual, $expected);
-            let error = track!(ErrorKind::Invalid.cause(cause)).into();
-            return DecodeFieldResult::Err(DecodeError::new($reader, error));
-        }
-    }
-}
-macro_rules! try_decode_variant {
-    ($field:expr, $reader:expr, $tag:expr, $wire_type:expr, $variant:expr) => {
-        match $field.decode_field($reader, $tag, $wire_type, Default::default()) {
-            DecodeFieldResult::Err(e) => return DecodeFieldResult::Err(track!(e)),
-            DecodeFieldResult::Ok(v) => return DecodeFieldResult::Ok($variant(v)),
-            DecodeFieldResult::NotTarget(r, _) => r
+            let error = track!(::ErrorKind::Invalid.cause(cause)).into();
+            return Err(::Error{stream: $reader, error})
         }
     }
 }
 
-impl<R: Read, T: Decode<R>> DecodeField<R> for Singular<T> {
-    type Future = T::Future;
-    fn decode_field(
-        self,
-        reader: R,
-        tag: Tag,
-        wire_type: WireType,
-        acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        check_tag!(reader, acc, tag, self.tag);
-        assert_wire_type!(reader, wire_type, T::wire_type());
-        DecodeFieldResult::Ok(self.value.decode(reader))
+impl<R, T, F> DecodeField<R> for fields::Field<T, F>
+where
+    R: Read,
+    T: Tag,
+    F: Type + Decode<R>,
+{
+    type Value = F::Value;
+    type Future = F::Future;
+    fn is_target(tag: u32) -> bool {
+        tag == T::number()
     }
-}
-
-impl<R: Read> DecodeField<R> for fields::Ignore {
-    type Future = Ignore<R>;
     fn decode_field(
-        self,
         reader: R,
-        _tag: Tag,
+        tag: u32,
         wire_type: WireType,
         _acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        DecodeFieldResult::Ok(Ignore::new(reader, wire_type))
+    ) -> Result<Self::Future, Error<R>> {
+        assert_eq!(tag, T::number());
+        track_assert_wire_type!(reader, wire_type, F::wire_type());
+        Ok(F::decode(reader))
     }
 }
 
-impl<R: Read> DecodeField<R> for fields::ReservedTag {
-    type Future = Unused<R, ()>;
-    fn decode_field(
-        self,
-        reader: R,
-        _tag: Tag,
-        _wire_type: WireType,
-        acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        DecodeFieldResult::NotTarget(reader, acc)
-    }
-}
-
-impl<R: Read> DecodeField<R> for fields::ReservedName {
-    type Future = Unused<R, ()>;
-    fn decode_field(
-        self,
-        reader: R,
-        _tag: Tag,
-        _wire_type: WireType,
-        acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        DecodeFieldResult::NotTarget(reader, acc)
-    }
-}
-
-impl<R: Read, T: Decode<R>> DecodeField<R> for fields::Repeated<T> {
-    type Future = Push<R, T::Future, T::Value>;
-    fn decode_field(
-        self,
-        reader: R,
-        tag: Tag,
-        wire_type: WireType,
-        acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        check_tag!(reader, acc, tag, self.tag);
-        assert_wire_type!(reader, wire_type, T::wire_type());
-        DecodeFieldResult::Ok(Push::new(self.value.decode(reader), acc))
-    }
-}
-
-impl<R: Read, T> DecodeField<R> for fields::PackedRepeated<T>
+impl<R, T, F> DecodeField<R> for fields::RepeatedField<T, F>
 where
-    T: Decode<Take<R>> + Clone,
+    R: Read,
+    T: Tag,
+    F: Type + Decode<R>,
 {
-    type Future = futures::DecodePacked<R, T>;
+    type Value = Vec<F::Value>;
+    type Future = VecPush<R, F::Future, F::Value>;
+    fn is_target(tag: u32) -> bool {
+        tag == T::number()
+    }
     fn decode_field(
-        self,
         reader: R,
-        tag: Tag,
+        tag: u32,
         wire_type: WireType,
         acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        check_tag!(reader, acc, tag, self.tag);
-        assert_wire_type!(reader, wire_type, WireType::LengthDelimited);
-        DecodeFieldResult::Ok(self.value.decode(reader))
+    ) -> Result<Self::Future, Error<R>> {
+        assert_eq!(tag, T::number());
+        track_assert_wire_type!(reader, wire_type, F::wire_type());
+        Ok(VecPush::new(acc, F::decode(reader)))
     }
 }
 
-impl<R, A, B> DecodeField<R> for fields::Oneof<(A, B)>
+
+struct Packed<F>(PhantomData<F>);
+impl<R: Read, F: Decode<Take<R>>> Decode<Take<R>> for Packed<F> {
+    type Value = Vec<F::Value>;
+    type Future = Either<DecodePacked<R, F>, Finished<Take<R>, Self::Value>>;
+    fn decode(reader: Take<R>) -> Self::Future {
+        if reader.limit() == 0 {
+            Either::B(futures::finished((reader, Vec::new())))
+        } else {
+            let future = F::decode(reader);
+            let values = Vec::new();
+            Either::A(DecodePacked { future, values })
+        }
+    }
+}
+struct DecodePacked<R, F>
+where
+    R: Read,
+    F: Decode<Take<R>>,
+{
+    future: F::Future,
+    values: Vec<F::Value>,
+}
+impl<R: Read, F: Decode<Take<R>>> Future for DecodePacked<R, F> {
+    type Item = (Take<R>, Vec<F::Value>);
+    type Error = Error<Take<R>>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        while let Async::Ready((r, v)) = track!(self.future.poll())? {
+            self.values.push(v);
+            if r.limit() == 0 {
+                let values = mem::replace(&mut self.values, Vec::new());
+                return Ok(Async::Ready((r, values)));
+            }
+            self.future = F::decode(r);
+        }
+        Ok(Async::NotReady)
+    }
+}
+
+pub struct DecodePackedRepeated<R, F>(DecodeLengthDelimited<R, Packed<F>>)
+where
+    R: Read,
+    F: Decode<Take<R>>;
+impl<R: Read, F: Decode<Take<R>>> Future for DecodePackedRepeated<R, F> {
+    type Item = (R, Vec<F::Value>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        track!(self.0.poll())
+    }
+}
+impl<R, T, F> DecodeField<R> for fields::PackedRepeatedField<T, F>
+where
+    R: Read,
+    T: Tag,
+    F: Type + Decode<Take<R>>,
+{
+    type Value = Vec<F::Value>;
+    type Future = DecodePackedRepeated<R, F>;
+    fn is_target(tag: u32) -> bool {
+        tag == T::number()
+    }
+    fn decode_field(
+        reader: R,
+        tag: u32,
+        wire_type: WireType,
+        _acc: Self::Value,
+    ) -> Result<Self::Future, Error<R>> {
+        assert_eq!(tag, T::number());
+        track_assert_wire_type!(reader, wire_type, WireType::LengthDelimited);
+        panic!()
+    }
+}
+
+#[derive(Debug)]
+pub enum DecodeOneof2<R, A, B>
 where
     R: Read,
     A: DecodeField<R>,
     B: DecodeField<R>,
 {
-    type Future = DecodeVariant2<R, A, B>;
+    A(A::Future),
+    B(B::Future),
+}
+impl<R, A, B> Future for DecodeOneof2<R, A, B>
+where
+    R: Read,
+    A: DecodeField<R>,
+    B: DecodeField<R>,
+{
+    type Item = (R, Option<Variant2<A::Value, B::Value>>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(match *self {
+            DecodeOneof2::A(ref mut f) => track!(f.poll())?.map(|(r, v)| (r, Some(Variant2::A(v)))),
+            DecodeOneof2::B(ref mut f) => track!(f.poll())?.map(|(r, v)| (r, Some(Variant2::B(v)))),
+        })
+    }
+}
+impl<R, A, B> DecodeField<R> for fields::Oneof<(A, B)>
+where
+    R: Read,
+    A: DecodeField<R> + SingularField,
+    B: DecodeField<R> + SingularField,
+{
+    type Value = Option<Variant2<A::Value, B::Value>>;
+    type Future = DecodeOneof2<R, A, B>;
+    fn is_target(tag: u32) -> bool {
+        A::is_target(tag) || B::is_target(tag)
+    }
     fn decode_field(
-        self,
         reader: R,
-        tag: Tag,
+        tag: u32,
         wire_type: WireType,
-        acc: Self::Value,
-    ) -> DecodeFieldResult<Self::Future, R, Self::Value> {
-        let r = reader;
-        let r = try_decode_variant!(self.fields.0, r, tag, wire_type, DecodeVariant2::A);
-        let r = try_decode_variant!(self.fields.1, r, tag, wire_type, DecodeVariant2::B);
-        DecodeFieldResult::NotTarget(r, acc)
+        _acc: Self::Value,
+    ) -> Result<Self::Future, Error<R>> {
+        if A::is_target(tag) {
+            let f = track!(A::decode_field(reader, tag, wire_type, Default::default()))?;
+            Ok(DecodeOneof2::A(f))
+        } else {
+            assert!(B::is_target(tag));
+            let f = track!(B::decode_field(reader, tag, wire_type, Default::default()))?;
+            Ok(DecodeOneof2::B(f))
+        }
     }
 }

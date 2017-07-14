@@ -1,28 +1,25 @@
 use std;
+use std::io;
 use trackable;
-use trackable::error::TrackableError;
-use trackable::error::ErrorKind as TrackableErrorKind;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ErrorKind {
-    Unsupported,
-    Invalid,
-    UnexpectedEos,
-    Other,
-}
-impl TrackableErrorKind for ErrorKind {}
+use Error;
 
 #[derive(Debug)]
-pub struct Error<T> {
-    pub stream: T,
-    pub error: TrackableError<ErrorKind>,
+pub struct EncodeError<W> {
+    pub writer: W,
+    pub error: Error,
 }
-impl<R> std::fmt::Display for Error<R> {
+impl<W> EncodeError<W> {
+    pub(crate) fn new(writer: W, error: Error) -> Self {
+        EncodeError { writer, error }
+    }
+}
+impl<W> std::fmt::Display for EncodeError<W> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.error.fmt(f)
     }
 }
-impl<R: std::fmt::Debug> std::error::Error for Error<R> {
+impl<W: std::fmt::Debug> std::error::Error for EncodeError<W> {
     fn description(&self) -> &str {
         self.error.description()
     }
@@ -30,7 +27,7 @@ impl<R: std::fmt::Debug> std::error::Error for Error<R> {
         self.error.cause()
     }
 }
-impl<R> trackable::Trackable for Error<R> {
+impl<W> trackable::Trackable for EncodeError<W> {
     type Event = trackable::error::Event;
     fn assign_tracking_number(&mut self) {
         self.error.assign_tracking_number();
@@ -57,5 +54,13 @@ impl<R> trackable::Trackable for Error<R> {
     }
     fn history_mut(&mut self) -> Option<&mut trackable::History<Self::Event>> {
         self.error.history_mut()
+    }
+}
+impl<W> From<EncodeError<io::Take<W>>> for EncodeError<W> {
+    fn from(f: EncodeError<io::Take<W>>) -> Self {
+        EncodeError {
+            writer: f.writer.into_inner(),
+            error: f.error,
+        }
     }
 }
