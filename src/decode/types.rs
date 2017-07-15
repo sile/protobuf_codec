@@ -1,12 +1,14 @@
+use std;
 use std::io::Read;
 use std::mem;
 use futures::{Future, Poll, Async};
 
-use Error;
+use {Error, ErrorKind};
 use types;
 use util_futures::Phase4;
+use wire::types::Varint;
 use super::{Decode, DecodeField};
-use super::futures::{DecodeTagAndWireType, DiscardWireValue};
+use super::futures::{DecodeTagAndWireType, DiscardWireValue, DecodeVarint};
 
 pub struct DecodeMessage2<R, A, B>
 where
@@ -72,5 +74,33 @@ where
         let phase = Phase4::A(DecodeTagAndWireType::new(reader));
         let values = Default::default();
         DecodeMessage2 { phase, values }
+    }
+}
+
+#[derive(Debug)]
+pub struct DecodeInt32<R>(DecodeVarint<R>);
+impl<R: Read> Future for DecodeInt32<R> {
+    type Item = (R, i32);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, n)) = track!(self.0.poll())? {
+            let n = n as i64;
+            if n > std::i32::MAX as i64 {
+                failed!(r, ErrorKind::Invalid, "Too large `int32` value: {}", n);
+            }
+            if n < std::i32::MIN as i64 {
+                failed!(r, ErrorKind::Invalid, "Too small `int32` value: {}", n);
+            }
+            Ok(Async::Ready((r, n as i32)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+impl<R: Read> Decode<R> for types::Int32 {
+    type Value = i32;
+    type Future = DecodeInt32<R>;
+    fn decode(reader: R) -> Self::Future {
+        DecodeInt32(Varint::decode(reader))
     }
 }

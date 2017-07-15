@@ -3,6 +3,7 @@ extern crate futures;
 #[macro_use]
 extern crate trackable;
 
+pub use decode::Decode;
 pub use types::Message;
 
 pub use error::{Error, ErrorKind};

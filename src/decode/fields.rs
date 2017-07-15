@@ -10,6 +10,7 @@ use traits::{Tag, Type, SingularField};
 use util_futures::Finished;
 use variants::Variant2;
 use wire::WireType;
+use wire::types::LengthDelimited;
 use super::{Decode, DecodeField};
 use super::futures::{VecPush, DecodeLengthDelimited};
 
@@ -140,7 +141,9 @@ where
     ) -> Result<Self::Future, Error<R>> {
         assert_eq!(tag, T::number());
         track_assert_wire_type!(reader, wire_type, WireType::LengthDelimited);
-        panic!()
+        Ok(DecodePackedRepeated(
+            LengthDelimited::<Packed<F>>::decode(reader),
+        ))
     }
 }
 
