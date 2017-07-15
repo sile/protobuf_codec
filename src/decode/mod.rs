@@ -1,8 +1,9 @@
+use std;
 use std::io::Read;
 use futures::Future;
 use trackable::error::TrackableError;
 
-use {Error, ErrorKind};
+use {Result, Error, ErrorKind};
 use traits::Field;
 use wire::WireType;
 
@@ -16,7 +17,7 @@ pub trait Decode<R: Read> {
     type Value: Default;
     type Future: Future<Item = (R, Self::Value), Error = Error<R>>;
     fn decode(reader: R) -> Self::Future;
-    fn sync_decode(reader: R) -> Result<Self::Value, TrackableError<ErrorKind>> {
+    fn sync_decode(reader: R) -> Result<Self::Value> {
         Self::decode(reader).wait().map(|(_, v)| v).map_err(
             |e| e.error,
         )
@@ -32,7 +33,7 @@ pub trait DecodeField<R: Read>: Field {
         tag: u32,
         wire_type: WireType,
         acc: Self::Value,
-    ) -> Result<Self::Future, Error<R>>;
+    ) -> std::result::Result<Self::Future, Error<R>>;
 }
 
 #[cfg(test)]

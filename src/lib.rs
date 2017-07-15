@@ -4,35 +4,10 @@ extern crate futures;
 extern crate trackable;
 
 pub use decode::Decode;
+pub use encode::Encode;
 pub use types::Message;
 
 pub use error::{Error, ErrorKind};
-
-// pub mod composites;
-// pub mod encode;
-// pub mod fields;
-// pub mod scalars;
-// pub mod variants;
-// pub mod wires;
-
-// // TODO
-// pub mod temp;
-
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub struct Tag(pub u32);
-
-// pub trait Payload {
-//     type Value: Default; // TODO
-// }
-
-// pub trait Type {
-//     type Value: Default;
-//     fn wire_type() -> WireType;
-// }
-
-// pub trait Field {
-//     type Value: Default;
-// }
 
 macro_rules! failed {
     ($stream:expr, $kind:expr) => {
@@ -59,6 +34,7 @@ macro_rules! failed_by_error {
 }
 
 pub mod decode;
+pub mod encode;
 pub mod fields;
 pub mod traits;
 pub mod tags;
@@ -68,3 +44,5 @@ pub mod wire;
 
 mod error;
 mod util_futures;
+
+pub type Result<T> = std::result::Result<T, trackable::error::TrackableError<ErrorKind>>;

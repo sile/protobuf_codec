@@ -1,30 +1,28 @@
 use std::io::{self, Write};
 use futures::{Future, Poll, Async};
 
-pub use super::composites::EncodeMessage2;
-pub use super::fields::{EncodeField, EncodeRepeated, EncodePackedRepeated};
-pub use super::variants::EncodeVariant2;
+// pub use super::composites::EncodeMessage2;
+// pub use super::fields::{EncodeField, EncodeRepeated, EncodePackedRepeated};
+// pub use super::variants::EncodeVariant2;
 pub use super::wires::{EncodeVarint, EncodeLengthDelimited};
 
-use {Tag, WireType, ErrorKind};
-use wires;
-use super::{Encode, EncodeError};
+use {Error, ErrorKind};
 
-#[derive(Debug)]
-pub struct EncodeTagAndWireType<W>(EncodeVarint<W>);
-impl<W: Write> EncodeTagAndWireType<W> {
-    pub fn new(tag: Tag, wire_type: WireType, writer: W) -> Self {
-        let n = (tag.0 << 3) as u64 | wire_type as u64;
-        EncodeTagAndWireType(wires::Varint::encode(n, writer))
-    }
-}
-impl<W: Write> Future for EncodeTagAndWireType<W> {
-    type Item = W;
-    type Error = EncodeError<W>;
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        track!(self.0.poll())
-    }
-}
+// #[derive(Debug)]
+// pub struct EncodeTagAndWireType<W>(EncodeVarint<W>);
+// impl<W: Write> EncodeTagAndWireType<W> {
+//     pub fn new(tag: Tag, wire_type: WireType, writer: W) -> Self {
+//         let n = (tag.0 << 3) as u64 | wire_type as u64;
+//         EncodeTagAndWireType(wires::Varint::encode(n, writer))
+//     }
+// }
+// impl<W: Write> Future for EncodeTagAndWireType<W> {
+//     type Item = W;
+//     type Error = Error<W>;
+//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+//         track!(self.0.poll())
+//     }
+// }
 
 #[derive(Debug)]
 pub struct WriteByte<W> {
@@ -32,7 +30,7 @@ pub struct WriteByte<W> {
     byte: u8,
 }
 impl<W> WriteByte<W> {
-    pub fn new(byte: u8, writer: W) -> Self {
+    pub fn new(writer: W, byte: u8) -> Self {
         WriteByte {
             byte,
             writer: Some(writer),
@@ -41,7 +39,7 @@ impl<W> WriteByte<W> {
 }
 impl<W: Write> Future for WriteByte<W> {
     type Item = W;
-    type Error = EncodeError<W>;
+    type Error = Error<W>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut writer = self.writer.take().expect("Cannot poll WriteByte twice");
         match writer.write(&[self.byte][..]) {
@@ -64,7 +62,7 @@ pub struct WriteBytes<W, B> {
     offset: usize,
 }
 impl<W, B> WriteBytes<W, B> {
-    pub fn new(bytes: B, writer: W) -> Self {
+    pub fn new(writer: W, bytes: B) -> Self {
         WriteBytes {
             writer: Some(writer),
             bytes,
@@ -74,7 +72,7 @@ impl<W, B> WriteBytes<W, B> {
 }
 impl<W: Write, B: AsRef<[u8]>> Future for WriteBytes<W, B> {
     type Item = W;
-    type Error = EncodeError<W>;
+    type Error = Error<W>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut writer = self.writer.take().expect("Cannot poll WriteBytes twice");
         loop {

@@ -7,6 +7,30 @@ use Error;
 pub type Finished<S, T> = future::Finished<(S, T), Error<S>>;
 
 #[derive(Debug)]
+pub struct WithState<F, T> {
+    pub future: F,
+    pub state: Option<T>,
+}
+impl<F, T> WithState<F, T> {
+    pub fn new(future: F, state: T) -> Self {
+        WithState {
+            future,
+            state: Some(state),
+        }
+    }
+}
+impl<F: Future, T> Future for WithState<F, T> {
+    type Item = (F::Item, T);
+    type Error = F::Error;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(self.future.poll()?.map(|v| {
+            let s = self.state.take().expect("Cannot poll WithState twice");
+            (v, s)
+        }))
+    }
+}
+
+#[derive(Debug)]
 pub struct UnwrapTake<F>(pub F);
 impl<R, V, F> Future for UnwrapTake<F>
 where
