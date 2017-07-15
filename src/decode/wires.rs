@@ -10,7 +10,7 @@ use super::futures::{ReadByte, ReadBytes};
 
 impl<R: Read> Decode<R> for Bit32 {
     type Value = [u8; 4];
-    type Future = ReadBytes<R, Self::Value>;
+    type Future = ReadBytes<R, [u8; 4]>;
     fn decode(reader: R) -> Self::Future {
         ReadBytes::new(reader, [0; 4])
     }
@@ -18,7 +18,7 @@ impl<R: Read> Decode<R> for Bit32 {
 
 impl<R: Read> Decode<R> for Bit64 {
     type Value = [u8; 8];
-    type Future = ReadBytes<R, Self::Value>;
+    type Future = ReadBytes<R, [u8; 8]>;
     fn decode(reader: R) -> Self::Future {
         ReadBytes::new(reader, [0; 8])
     }

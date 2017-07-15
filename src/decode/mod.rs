@@ -1,9 +1,8 @@
 use std;
 use std::io::Read;
 use futures::Future;
-use trackable::error::TrackableError;
 
-use {Result, Error, ErrorKind};
+use {Result, Error};
 use traits::Field;
 use wire::WireType;
 

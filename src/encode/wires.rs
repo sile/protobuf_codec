@@ -47,10 +47,8 @@ impl<W: Write> Encode<W> for Varint {
         EncodeVarint::new(writer, value)
     }
     fn encoded_size(value: &u64) -> u64 {
-        let mut n = *value;
         for i in 1.. {
-            n >>= 7;
-            if n == 0 {
+            if (*value >> (i * 7)) == 0 {
                 return i;
             }
         }

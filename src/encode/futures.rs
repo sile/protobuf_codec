@@ -1,28 +1,29 @@
 use std::io::{self, Write};
 use futures::{Future, Poll, Async};
 
-// pub use super::composites::EncodeMessage2;
-// pub use super::fields::{EncodeField, EncodeRepeated, EncodePackedRepeated};
-// pub use super::variants::EncodeVariant2;
+pub use super::fields::EncodeField;
 pub use super::wires::{EncodeVarint, EncodeLengthDelimited};
 
 use {Error, ErrorKind};
+use wire::WireType;
+use wire::types::Varint;
+use super::Encode;
 
-// #[derive(Debug)]
-// pub struct EncodeTagAndWireType<W>(EncodeVarint<W>);
-// impl<W: Write> EncodeTagAndWireType<W> {
-//     pub fn new(tag: Tag, wire_type: WireType, writer: W) -> Self {
-//         let n = (tag.0 << 3) as u64 | wire_type as u64;
-//         EncodeTagAndWireType(wires::Varint::encode(n, writer))
-//     }
-// }
-// impl<W: Write> Future for EncodeTagAndWireType<W> {
-//     type Item = W;
-//     type Error = Error<W>;
-//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//         track!(self.0.poll())
-//     }
-// }
+#[derive(Debug)]
+pub struct EncodeTagAndWireType<W>(EncodeVarint<W>);
+impl<W: Write> EncodeTagAndWireType<W> {
+    pub fn new(writer: W, tag: u32, wire_type: WireType) -> Self {
+        let n = (tag << 3) as u64 | wire_type as u64;
+        EncodeTagAndWireType(Varint::encode(writer, n))
+    }
+}
+impl<W: Write> Future for EncodeTagAndWireType<W> {
+    type Item = W;
+    type Error = Error<W>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        track!(self.0.poll())
+    }
+}
 
 #[derive(Debug)]
 pub struct WriteByte<W> {
