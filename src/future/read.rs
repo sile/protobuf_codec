@@ -1,4 +1,5 @@
 use std::io::{self, Read};
+use std::mem;
 use futures::{Future, Poll, Async};
 
 use {Error, ErrorKind};
@@ -72,6 +73,58 @@ impl<R: Read, B: AsMut<[u8]>> Future for ReadBytes<R, B> {
                     } else if read_size == 0 {
                         failed!(r, ErrorKind::UnexpectedEos);
                     }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ReadAllBytes<R> {
+    reader: Option<R>,
+    bytes: Vec<u8>,
+    offset: usize,
+}
+impl<R> ReadAllBytes<R> {
+    pub fn new(reader: R) -> Self {
+        ReadAllBytes {
+            reader: Some(reader),
+            bytes: vec![0; 64],
+            offset: 0,
+        }
+    }
+    pub fn with_capacity(reader: R, capacity: usize) -> Self {
+        ReadAllBytes {
+            reader: Some(reader),
+            bytes: vec![0; capacity],
+            offset: 0,
+        }
+    }
+}
+impl<R: Read> Future for ReadAllBytes<R> {
+    type Item = (R, Vec<u8>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let mut r = self.reader.take().expect("Cannot poll ReadAllBytes twice");
+        loop {
+            if self.offset == self.bytes.len() {
+                self.bytes.resize(self.offset * 2, 0);
+            }
+            match r.read(&mut self.bytes[self.offset..]) {
+                Err(e) => {
+                    if e.kind() != io::ErrorKind::WouldBlock {
+                        failed_by_error!(r, ErrorKind::Other, e);
+                    }
+                    self.reader = Some(r);
+                    return Ok(Async::NotReady);
+                }
+                Ok(0) => {
+                    let mut bytes = mem::replace(&mut self.bytes, Vec::new());
+                    bytes.truncate(self.offset);
+                    return Ok(Async::Ready((r, bytes)));
+                }
+                Ok(read_size) => {
+                    self.offset += read_size;
                 }
             }
         }

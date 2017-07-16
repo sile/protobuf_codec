@@ -2,24 +2,10 @@ use std::io::{Read, Take};
 use futures::{Future, Poll, Async};
 
 use {Error, ErrorKind, Decode};
-use future::read::{ReadByte, ReadBytes};
+use future::read::ReadByte;
 use future::util::{UnwrapTake, Phase2};
 use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
 use super::convert::DecodeInto;
-
-impl<R: Read> Decode<R> for [u8; 4] {
-    type Future = ReadBytes<R, Self>;
-    fn decode(reader: R) -> Self::Future {
-        ReadBytes::new(reader, [0; 4])
-    }
-}
-
-impl<R: Read> Decode<R> for [u8; 8] {
-    type Future = ReadBytes<R, Self>;
-    fn decode(reader: R) -> Self::Future {
-        ReadBytes::new(reader, [0; 8])
-    }
-}
 
 impl<R: Read> Decode<R> for Bit32 {
     type Future = DecodeInto<R, [u8; 4], Self>;
