@@ -4,7 +4,7 @@ extern crate futures;
 extern crate trackable;
 
 pub use traits::{Decode, Encode};
-pub use types::Message;
+pub use message::Message;
 
 pub use error::{Error, ErrorKind};
 
@@ -41,5 +41,6 @@ pub mod variants;
 pub mod wire;
 
 mod error;
+mod message;
 
 pub type Result<T> = std::result::Result<T, trackable::error::TrackableError<ErrorKind>>;

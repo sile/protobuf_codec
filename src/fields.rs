@@ -1,14 +1,14 @@
-use traits::{self, Tag, Type, SingularField};
+use traits::{self, Tag, FieldType, SingularField};
 use variants;
 
 #[derive(Debug, Default)]
-pub struct Field<T: Tag, V: Type> {
+pub struct Field<T: Tag, V: FieldType> {
     pub tag: T,
     pub value: V,
 }
-impl<T: Tag, V: Type> traits::Field for Field<T, V> {}
-impl<T: Tag, V: Type> traits::SingularField for Field<T, V> {}
-impl<T: Tag, V: Type> From<V> for Field<T, V> {
+impl<T: Tag, V: FieldType> traits::Field for Field<T, V> {}
+impl<T: Tag, V: FieldType> traits::SingularField for Field<T, V> {}
+impl<T: Tag, V: FieldType> From<V> for Field<T, V> {
     fn from(f: V) -> Self {
         Field {
             tag: T::default(),
@@ -18,12 +18,12 @@ impl<T: Tag, V: Type> From<V> for Field<T, V> {
 }
 
 #[derive(Debug, Default)]
-pub struct RepeatedField<T: Tag, V: Type> {
+pub struct RepeatedField<T: Tag, V: FieldType> {
     pub tag: T,
     pub values: Vec<V>,
 }
-impl<T: Tag, V: Type> traits::Field for RepeatedField<T, V> {}
-impl<T: Tag, V: Type> From<Vec<V>> for RepeatedField<T, V> {
+impl<T: Tag, V: FieldType> traits::Field for RepeatedField<T, V> {}
+impl<T: Tag, V: FieldType> From<Vec<V>> for RepeatedField<T, V> {
     fn from(f: Vec<V>) -> Self {
         RepeatedField {
             tag: T::default(),
@@ -33,12 +33,12 @@ impl<T: Tag, V: Type> From<Vec<V>> for RepeatedField<T, V> {
 }
 
 #[derive(Debug, Default)]
-pub struct PackedRepeatedField<T: Tag, V: Type> {
+pub struct PackedRepeatedField<T: Tag, V: FieldType> {
     pub tag: T,
     pub values: Vec<V>,
 }
-impl<T: Tag, V: Type> traits::Field for PackedRepeatedField<T, V> {}
-impl<T: Tag, V: Type> From<Vec<V>> for PackedRepeatedField<T, V> {
+impl<T: Tag, V: FieldType> traits::Field for PackedRepeatedField<T, V> {}
+impl<T: Tag, V: FieldType> From<Vec<V>> for PackedRepeatedField<T, V> {
     fn from(f: Vec<V>) -> Self {
         PackedRepeatedField {
             tag: T::default(),

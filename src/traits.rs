@@ -10,13 +10,18 @@ pub trait Tag: Default {
     fn number() -> u32;
 }
 
-pub trait Type: Default {
+// TODO(?): s/FieldType/WireType/
+pub trait FieldType: Default {
     fn wire_type() -> WireType;
 }
+
+pub trait Packable: FieldType {}
 
 pub trait Field: Default {}
 
 pub trait SingularField: Field {}
+
+pub trait Message: Default {}
 
 pub trait Encode<W: Write>: Sized {
     type Future: Future<Item = W, Error = Error<W>>;
