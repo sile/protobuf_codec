@@ -47,47 +47,40 @@ impl<T: Tag, V: FieldType> From<Vec<V>> for PackedRepeatedField<T, V> {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Oneof1<A>
-where
-    A: SingularField,
-{
-    pub field: Option<A>,
-}
-impl<A> traits::Field for Oneof1<A>
-where
-    A: SingularField,
-{
-}
-impl<A> From<Option<A>> for Oneof1<A>
-where
-    A: SingularField,
-{
-    fn from(f: Option<A>) -> Self {
-        Oneof1 { field: f }
+macro_rules! define_oneof {
+    ($name:ident, $variant:ident, $($param:ident),*) => {
+        #[derive(Debug)]
+        pub struct $name<$($param),*> {
+            pub field: Option<variants::$variant<$($param),*>>,
+        }
+        impl<$($param),*> traits::Field for $name<$($param),*>
+        where
+            $($param: SingularField),*
+        {
+        }
+        impl<$($param),*> From<variants::$variant<$($param),*>> for $name<$($param),*> {
+            fn from(f: variants::$variant<$($param),*>) -> Self {
+                $name { field: Some(f) }
+            }
+        }
+        impl<$($param),*> From<Option<variants::$variant<$($param),*>>> for $name<$($param),*> {
+            fn from(f: Option<variants::$variant<$($param),*>>) -> Self {
+                $name { field: f }
+            }
+        }
+        impl<$($param),*> Default for $name<$($param),*> {
+            fn default() -> Self {
+                $name { field: None }
+            }
+        }
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Oneof2<A, B>
-where
-    A: SingularField,
-    B: SingularField,
-{
-    pub field: Option<variants::Variant2<A, B>>,
-}
-impl<A, B> traits::Field for Oneof2<A, B>
-where
-    A: SingularField,
-    B: SingularField,
-{
-}
-impl<A, B> From<Option<variants::Variant2<A, B>>> for Oneof2<A, B>
-where
-    A: SingularField,
-    B: SingularField,
-{
-    fn from(f: Option<variants::Variant2<A, B>>) -> Self {
-        Oneof2 { field: f }
-    }
-}
+define_oneof!(Oneof1, Variant1, A);
+define_oneof!(Oneof2, Variant2, A, B);
+define_oneof!(Oneof3, Variant3, A, B, C);
+define_oneof!(Oneof4, Variant4, A, B, C, D);
+define_oneof!(Oneof5, Variant5, A, B, C, D, E);
+define_oneof!(Oneof6, Variant6, A, B, C, D, E, F);
+define_oneof!(Oneof7, Variant7, A, B, C, D, E, F, G);
+define_oneof!(Oneof8, Variant8, A, B, C, D, E, F, G, H);
