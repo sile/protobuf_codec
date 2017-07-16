@@ -5,7 +5,8 @@ extern crate trackable;
 
 pub use decode::Decode;
 pub use encode::Encode;
-pub use types::Message;
+pub use traits::DerivedType;
+pub use types::{Message, Derived};
 
 pub use error::{Error, ErrorKind};
 

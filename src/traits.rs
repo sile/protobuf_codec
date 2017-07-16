@@ -1,3 +1,4 @@
+use Result;
 use wire::WireType;
 
 pub trait Tag {
@@ -19,21 +20,20 @@ pub trait Field: Pattern {}
 
 pub trait SingularField: Field {}
 
-// pub trait DerivedType: Sized {
-//     type BaseType: Type;
-//     type BaseValue;
-//     fn from_base(value: Self::BaseValue) -> Result<Self>;
-//     fn into_base(self) -> Self::BaseValue;
-//     // fn encode<W: Write>(self, writer: W) -> <Self::BaseType as Encode<W>>::Future
-//     // where
-//     //     Self::BaseType: Encode<W, Value = Self::BaseValue>,
-//     // {
-//     //     Self::BaseType::encode(writer, self.into_base())
-//     // }
-//     // fn decode<R: Read>(reader: R) -> <Self::BaseType as Decode<R>>::Future
-//     // where
-//     //     Self::BaseType: Decode<R, Value = Self::BaseValue>,
-//     // {
-//     //     Self::BaseType::decode(reader)
-//     // }
-// }
+pub trait DerivedType: Sized + Default {
+    type Base: Type;
+    fn from_base(value: <Self::Base as Pattern>::Value) -> Result<Self>;
+    fn into_base(self) -> <Self::Base as Pattern>::Value;
+    // fn encode<W: Write>(self, writer: W) -> <Self::Base as Encode<W>>::Future
+    // where
+    //     Self::Base: Encode<W, Value = Self::BaseValue>,
+    // {
+    //     Self::Base::encode(writer, self.into_base())
+    // }
+    // fn decode<R: Read>(reader: R) -> <Self::Base as Decode<R>>::Future
+    // where
+    //     Self::Base: Decode<R, Value = Self::BaseValue>,
+    // {
+    //     Self::Base::decode(reader)
+    // }
+}

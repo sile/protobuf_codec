@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use traits::{Type, Field, Pattern};
+use traits::{Type, Field, Pattern, DerivedType};
 use wire::WireType;
 
 pub struct Bool;
@@ -130,6 +130,16 @@ impl Pattern for Str {
 impl Type for Str {
     fn wire_type() -> WireType {
         WireType::LengthDelimited
+    }
+}
+
+pub struct Derived<T: DerivedType>(PhantomData<T>);
+impl<T: DerivedType> Pattern for Derived<T> {
+    type Value = T;
+}
+impl<T: DerivedType> Type for Derived<T> {
+    fn wire_type() -> WireType {
+        T::Base::wire_type()
     }
 }
 
