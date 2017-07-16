@@ -1,155 +1,81 @@
-use std::marker::PhantomData;
-
-use traits::{Type, Field, Pattern, DerivedType};
+use traits::{Type, Field};
 use wire::WireType;
 
-pub struct Bool;
-impl Pattern for Bool {
-    type Value = bool;
-}
-impl Type for Bool {
-    fn wire_type() -> WireType {
-        WireType::Varint
+macro_rules! impl_scalar_type {
+    ($t:ident, $base:ty, $wire:ident) => {
+        impl Type for $t {
+            fn wire_type() -> WireType {
+                WireType::$wire
+            }
+        }
+        impl From<$base> for $t {
+            fn from(f: $base) -> Self {
+                $t(f)
+            }
+        }
+        impl From<$t> for $base {
+            fn from(f: $t) -> Self {
+                f.0
+            }
+        }
     }
 }
 
-pub struct Int32;
-impl Pattern for Int32 {
-    type Value = i32;
-}
-impl Type for Int32 {
-    fn wire_type() -> WireType {
-        WireType::Varint
-    }
-}
+#[derive(Debug, Default)]
+pub struct Bool(pub bool);
+impl_scalar_type!(Bool, bool, Varint);
 
-pub struct Int64;
-impl Pattern for Int64 {
-    type Value = i64;
-}
-impl Type for Int64 {
-    fn wire_type() -> WireType {
-        WireType::Varint
-    }
-}
+#[derive(Debug, Default)]
+pub struct Int32(pub i32);
+impl_scalar_type!(Int32, i32, Varint);
 
-pub struct Uint32;
-impl Pattern for Uint32 {
-    type Value = u32;
-}
-impl Type for Uint32 {
-    fn wire_type() -> WireType {
-        WireType::Varint
-    }
-}
+#[derive(Debug, Default)]
+pub struct Int64(pub i64);
+impl_scalar_type!(Int64, i64, Varint);
 
-pub struct Uint64;
-impl Pattern for Uint64 {
-    type Value = u64;
-}
-impl Type for Uint64 {
-    fn wire_type() -> WireType {
-        WireType::Varint
-    }
-}
+#[derive(Debug, Default)]
+pub struct Uint32(pub u32);
+impl_scalar_type!(Uint32, u32, Varint);
 
-pub struct Sint32;
-impl Pattern for Sint32 {
-    type Value = i32;
-}
-impl Type for Sint32 {
-    fn wire_type() -> WireType {
-        WireType::Varint
-    }
-}
+#[derive(Debug, Default)]
+pub struct Uint64(pub u64);
+impl_scalar_type!(Uint64, u64, Varint);
 
-pub struct Sint64;
-impl Pattern for Sint64 {
-    type Value = i64;
-}
-impl Type for Sint64 {
-    fn wire_type() -> WireType {
-        WireType::Varint
-    }
-}
+#[derive(Debug, Default)]
+pub struct Sint32(pub i32);
+impl_scalar_type!(Sint32, i32, Varint);
 
-pub struct Fixed32;
-impl Pattern for Fixed32 {
-    type Value = u32;
-}
-impl Type for Fixed32 {
-    fn wire_type() -> WireType {
-        WireType::Bit32
-    }
-}
+#[derive(Debug, Default)]
+pub struct Sint64(pub i64);
+impl_scalar_type!(Sint64, i64, Varint);
 
-pub struct Fixed64;
-impl Pattern for Fixed64 {
-    type Value = u64;
-}
-impl Type for Fixed64 {
-    fn wire_type() -> WireType {
-        WireType::Bit64
-    }
-}
+#[derive(Debug, Default)]
+pub struct Fixed32(pub u32);
+impl_scalar_type!(Fixed32, u32, Bit32);
 
-pub struct Sfixed32;
-impl Pattern for Sfixed32 {
-    type Value = i32;
-}
-impl Type for Sfixed32 {
-    fn wire_type() -> WireType {
-        WireType::Bit32
-    }
-}
+#[derive(Debug, Default)]
+pub struct Fixed64(pub u64);
+impl_scalar_type!(Fixed64, u64, Bit64);
 
-pub struct Sfixed64;
-impl Pattern for Sfixed64 {
-    type Value = i64;
-}
-impl Type for Sfixed64 {
-    fn wire_type() -> WireType {
-        WireType::Bit64
-    }
-}
+#[derive(Debug, Default)]
+pub struct Sfixed32(pub i32);
+impl_scalar_type!(Sfixed32, i32, Bit32);
 
-pub struct Bytes;
-impl Pattern for Bytes {
-    type Value = Vec<u8>;
-}
-impl Type for Bytes {
-    fn wire_type() -> WireType {
-        WireType::LengthDelimited
-    }
-}
+#[derive(Debug, Default)]
+pub struct Sfixed64(pub i64);
+impl_scalar_type!(Sfixed64, i64, Bit64);
 
-pub struct Str;
-impl Pattern for Str {
-    type Value = String;
-}
-impl Type for Str {
-    fn wire_type() -> WireType {
-        WireType::LengthDelimited
-    }
-}
+#[derive(Debug, Default)]
+pub struct Bytes(pub Vec<u8>);
+impl_scalar_type!(Bytes, Vec<u8>, LengthDelimited);
 
-pub struct Derived<T: DerivedType>(PhantomData<T>);
-impl<T: DerivedType> Pattern for Derived<T> {
-    type Value = T;
-}
-impl<T: DerivedType> Type for Derived<T> {
-    fn wire_type() -> WireType {
-        T::Base::wire_type()
-    }
-}
+#[derive(Debug, Default)]
+pub struct Str(pub String);
+impl_scalar_type!(Str, String, LengthDelimited);
 
-pub struct Message<Fields>(PhantomData<Fields>);
-impl<A, B> Pattern for Message<(A, B)>
-where
-    A: Pattern,
-    B: Pattern,
-{
-    type Value = (A::Value, B::Value);
+#[derive(Debug, Default)]
+pub struct Message<Fields> {
+    pub fields: Fields,
 }
 impl<A, B> Type for Message<(A, B)>
 where

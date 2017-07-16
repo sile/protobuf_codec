@@ -6,7 +6,7 @@ use futures::future::Either;
 
 use Error;
 use fields;
-use traits::{Tag, Type, SingularField, Pattern};
+use traits::{Tag, Type, SingularField};
 use util_futures::Finished;
 use variants::Variant2;
 use wire::WireType;
@@ -72,9 +72,6 @@ where
 
 
 struct Packed<F>(PhantomData<F>);
-impl<F: Pattern> Pattern for Packed<F> {
-    type Value = Vec<F::Value>;
-}
 impl<R: Read, F: Decode<Take<R>>> Decode<Take<R>> for Packed<F> {
     type Future = Either<DecodePacked<R, F>, Finished<Take<R>, Self::Value>>;
     fn decode(reader: Take<R>) -> Self::Future {

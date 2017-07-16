@@ -2,7 +2,6 @@ use std::io::{self, Read, Take};
 use futures::{Future, Poll, Async};
 
 use {Error, ErrorKind};
-use traits::Pattern;
 use util_futures::{UnwrapTake, Phase2, Phase4};
 use wire::WireType;
 use wire::types::{Varint, Bit32, Bit64, LengthDelimited};

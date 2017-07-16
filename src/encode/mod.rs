@@ -2,7 +2,6 @@ use std::io::Write;
 use futures::Future;
 
 use {Result, Error};
-use traits::Pattern;
 
 pub mod futures;
 

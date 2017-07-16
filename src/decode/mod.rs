@@ -3,7 +3,7 @@ use std::io::Read;
 use futures::Future;
 
 use {Result, Error};
-use traits::{Pattern, Field};
+use traits::Field;
 use wire::WireType;
 
 pub mod futures;
