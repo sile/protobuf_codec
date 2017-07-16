@@ -31,7 +31,6 @@ impl<W: Write, F: Encode<W>> Future for EncodeField<W, F> {
     }
 }
 impl<W: Write, T: Tag, F: Type + Encode<W>> Encode<W> for fields::Field<T, F> {
-    type Value = F::Value;
     type Future = EncodeField<W, F>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let future = EncodeTagAndWireType::new(writer, T::number(), F::wire_type());

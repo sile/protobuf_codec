@@ -2,6 +2,7 @@ use std::io::{self, Read, Take};
 use futures::{Future, Poll, Async};
 
 use {Error, ErrorKind};
+use traits::Pattern;
 use util_futures::{UnwrapTake, Phase2, Phase4};
 use wire::WireType;
 use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
@@ -9,7 +10,6 @@ use super::Decode;
 use super::futures::{ReadByte, ReadBytes};
 
 impl<R: Read> Decode<R> for Bit32 {
-    type Value = [u8; 4];
     type Future = ReadBytes<R, [u8; 4]>;
     fn decode(reader: R) -> Self::Future {
         ReadBytes::new(reader, [0; 4])
@@ -17,7 +17,6 @@ impl<R: Read> Decode<R> for Bit32 {
 }
 
 impl<R: Read> Decode<R> for Bit64 {
-    type Value = [u8; 8];
     type Future = ReadBytes<R, [u8; 8]>;
     fn decode(reader: R) -> Self::Future {
         ReadBytes::new(reader, [0; 8])
@@ -59,7 +58,6 @@ impl<R: Read> Future for DecodeVarint<R> {
     }
 }
 impl<R: Read> Decode<R> for Varint {
-    type Value = u64;
     type Future = DecodeVarint<R>;
     fn decode(reader: R) -> Self::Future {
         DecodeVarint::new(reader)
@@ -121,7 +119,6 @@ where
     R: Read,
     T: Decode<Take<R>>,
 {
-    type Value = T::Value;
     type Future = DecodeLengthDelimited<R, T>;
     fn decode(reader: R) -> Self::Future {
         let phase = Phase2::A(Varint::decode(reader));
@@ -168,8 +165,10 @@ impl<R: Read> Future for DiscardWireValue<R> {
 
 #[derive(Debug)]
 struct Null;
-impl<R: Read> Decode<R> for Null {
+impl Pattern for Null {
     type Value = ();
+}
+impl<R: Read> Decode<R> for Null {
     type Future = DiscardAllBytes<R>;
     fn decode(reader: R) -> Self::Future {
         DiscardAllBytes { reader: Some(reader) }

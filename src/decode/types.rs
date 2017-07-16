@@ -68,7 +68,6 @@ where
     A: DecodeField<R>,
     B: DecodeField<R>,
 {
-    type Value = (A::Value, B::Value);
     type Future = DecodeMessage2<R, A, B>;
     fn decode(reader: R) -> Self::Future {
         let phase = Phase4::A(DecodeTagAndWireType::new(reader));
@@ -98,7 +97,6 @@ impl<R: Read> Future for DecodeInt32<R> {
     }
 }
 impl<R: Read> Decode<R> for types::Int32 {
-    type Value = i32;
     type Future = DecodeInt32<R>;
     fn decode(reader: R) -> Self::Future {
         DecodeInt32(Varint::decode(reader))

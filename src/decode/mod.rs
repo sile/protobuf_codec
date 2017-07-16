@@ -3,7 +3,7 @@ use std::io::Read;
 use futures::Future;
 
 use {Result, Error};
-use traits::Field;
+use traits::{Pattern, Field};
 use wire::WireType;
 
 pub mod futures;
@@ -12,8 +12,7 @@ mod fields;
 mod types;
 mod wires;
 
-pub trait Decode<R: Read> {
-    type Value: Default;
+pub trait Decode<R: Read>: Pattern {
     type Future: Future<Item = (R, Self::Value), Error = Error<R>>;
     fn decode(reader: R) -> Self::Future;
     fn sync_decode(reader: R) -> Result<Self::Value> {
@@ -24,7 +23,6 @@ pub trait Decode<R: Read> {
 }
 
 pub trait DecodeField<R: Read>: Field {
-    type Value: Default;
     type Future: Future<Item = (R, Self::Value), Error = Error<R>>;
     fn is_target(tag: u32) -> bool;
     fn decode_field(

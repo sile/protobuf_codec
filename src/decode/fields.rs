@@ -6,7 +6,7 @@ use futures::future::Either;
 
 use Error;
 use fields;
-use traits::{Tag, Type, SingularField};
+use traits::{Tag, Type, SingularField, Pattern};
 use util_futures::Finished;
 use variants::Variant2;
 use wire::WireType;
@@ -32,7 +32,6 @@ where
     T: Tag,
     F: Type + Decode<R>,
 {
-    type Value = F::Value;
     type Future = F::Future;
     fn is_target(tag: u32) -> bool {
         tag == T::number()
@@ -55,7 +54,6 @@ where
     T: Tag,
     F: Type + Decode<R>,
 {
-    type Value = Vec<F::Value>;
     type Future = VecPush<R, F::Future, F::Value>;
     fn is_target(tag: u32) -> bool {
         tag == T::number()
@@ -74,8 +72,10 @@ where
 
 
 struct Packed<F>(PhantomData<F>);
-impl<R: Read, F: Decode<Take<R>>> Decode<Take<R>> for Packed<F> {
+impl<F: Pattern> Pattern for Packed<F> {
     type Value = Vec<F::Value>;
+}
+impl<R: Read, F: Decode<Take<R>>> Decode<Take<R>> for Packed<F> {
     type Future = Either<DecodePacked<R, F>, Finished<Take<R>, Self::Value>>;
     fn decode(reader: Take<R>) -> Self::Future {
         if reader.limit() == 0 {
@@ -128,7 +128,6 @@ where
     T: Tag,
     F: Type + Decode<Take<R>>,
 {
-    type Value = Vec<F::Value>;
     type Future = DecodePackedRepeated<R, F>;
     fn is_target(tag: u32) -> bool {
         tag == T::number()
@@ -178,7 +177,6 @@ where
     A: DecodeField<R> + SingularField,
     B: DecodeField<R> + SingularField,
 {
-    type Value = Option<Variant2<A::Value, B::Value>>;
     type Future = DecodeOneof2<R, A, B>;
     fn is_target(tag: u32) -> bool {
         A::is_target(tag) || B::is_target(tag)

@@ -10,7 +10,6 @@ use super::Encode;
 use super::futures::{EncodeVarint, EncodeLengthDelimited, WriteBytes};
 
 impl<W: Write> Encode<W> for types::Bool {
-    type Value = bool;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         Varint::encode(writer, value as u64)
@@ -20,7 +19,6 @@ impl<W: Write> Encode<W> for types::Bool {
     }
 }
 impl<W: Write> Encode<W> for types::Uint32 {
-    type Value = u32;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         Varint::encode(writer, value as u64)
@@ -31,7 +29,6 @@ impl<W: Write> Encode<W> for types::Uint32 {
     }
 }
 impl<W: Write> Encode<W> for types::Uint64 {
-    type Value = u64;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         Varint::encode(writer, value)
@@ -41,7 +38,6 @@ impl<W: Write> Encode<W> for types::Uint64 {
     }
 }
 impl<W: Write> Encode<W> for types::Int32 {
-    type Value = i32;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         Varint::encode(writer, value as u64)
@@ -52,7 +48,6 @@ impl<W: Write> Encode<W> for types::Int32 {
     }
 }
 impl<W: Write> Encode<W> for types::Int64 {
-    type Value = i64;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         Varint::encode(writer, value as u64)
@@ -63,7 +58,6 @@ impl<W: Write> Encode<W> for types::Int64 {
     }
 }
 impl<W: Write> Encode<W> for types::Sint32 {
-    type Value = i32;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let n = value as u32;
@@ -77,7 +71,6 @@ impl<W: Write> Encode<W> for types::Sint32 {
     }
 }
 impl<W: Write> Encode<W> for types::Sint64 {
-    type Value = i64;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let n = value as u64;
@@ -91,7 +84,6 @@ impl<W: Write> Encode<W> for types::Sint64 {
     }
 }
 impl<W: Write> Encode<W> for types::Fixed32 {
-    type Value = u32;
     type Future = WriteBytes<W, [u8; 4]>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let mut bytes = [0; 4];
@@ -103,7 +95,6 @@ impl<W: Write> Encode<W> for types::Fixed32 {
     }
 }
 impl<W: Write> Encode<W> for types::Fixed64 {
-    type Value = u64;
     type Future = WriteBytes<W, [u8; 8]>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let mut bytes = [0; 8];
@@ -115,7 +106,6 @@ impl<W: Write> Encode<W> for types::Fixed64 {
     }
 }
 impl<W: Write> Encode<W> for types::Sfixed32 {
-    type Value = i32;
     type Future = WriteBytes<W, [u8; 4]>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let mut bytes = [0; 4];
@@ -127,7 +117,6 @@ impl<W: Write> Encode<W> for types::Sfixed32 {
     }
 }
 impl<W: Write> Encode<W> for types::Sfixed64 {
-    type Value = i64;
     type Future = WriteBytes<W, [u8; 8]>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let mut bytes = [0; 8];
@@ -139,7 +128,6 @@ impl<W: Write> Encode<W> for types::Sfixed64 {
     }
 }
 impl<W: Write> Encode<W> for types::Bytes {
-    type Value = Vec<u8>;
     type Future = EncodeLengthDelimited<W, Vec<u8>>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         LengthDelimited::<Vec<u8>>::encode(writer, value)
@@ -149,7 +137,6 @@ impl<W: Write> Encode<W> for types::Bytes {
     }
 }
 impl<W: Write> Encode<W> for types::Str {
-    type Value = String;
     type Future = EncodeLengthDelimited<W, Vec<u8>>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         LengthDelimited::<Vec<u8>>::encode(writer, value.into_bytes())
@@ -207,7 +194,6 @@ where
     A: Encode<W>,
     B: Encode<W>,
 {
-    type Value = (A::Value, B::Value);
     type Future = EncodeMessage2<W, A, B>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         EncodeMessage2::new(writer, value.0, value.1)

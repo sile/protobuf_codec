@@ -2,6 +2,7 @@ use std::io::Write;
 use futures::Future;
 
 use {Result, Error};
+use traits::Pattern;
 
 pub mod futures;
 
@@ -9,8 +10,7 @@ mod fields;
 mod types;
 mod wires;
 
-pub trait Encode<W: Write> {
-    type Value;
+pub trait Encode<W: Write>: Pattern {
     type Future: Future<Item = W, Error = Error<W>>;
     fn encode(writer: W, value: Self::Value) -> Self::Future;
     fn encoded_size(value: &Self::Value) -> u64;
@@ -21,7 +21,6 @@ pub trait Encode<W: Write> {
     }
 }
 impl<W: Write> Encode<W> for Vec<u8> {
-    type Value = Vec<u8>;
     type Future = futures::WriteBytes<W, Vec<u8>>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         futures::WriteBytes::new(writer, value)

@@ -41,7 +41,6 @@ impl<W: Write> Future for EncodeVarint<W> {
     }
 }
 impl<W: Write> Encode<W> for Varint {
-    type Value = u64;
     type Future = EncodeVarint<W>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         EncodeVarint::new(writer, value)
@@ -57,7 +56,6 @@ impl<W: Write> Encode<W> for Varint {
 }
 
 impl<W: Write> Encode<W> for Bit32 {
-    type Value = [u8; 4];
     type Future = WriteBytes<W, [u8; 4]>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         WriteBytes::new(writer, value)
@@ -68,7 +66,6 @@ impl<W: Write> Encode<W> for Bit32 {
 }
 
 impl<W: Write> Encode<W> for Bit64 {
-    type Value = [u8; 8];
     type Future = WriteBytes<W, [u8; 8]>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         WriteBytes::new(writer, value)
@@ -109,7 +106,6 @@ where
     W: Write,
     T: Encode<W>,
 {
-    type Value = T::Value;
     type Future = EncodeLengthDelimited<W, T>;
     fn encode(writer: W, value: Self::Value) -> Self::Future {
         let size = T::encoded_size(&value);
