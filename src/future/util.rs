@@ -1,7 +1,10 @@
 use std::io::Take;
 use futures::{Future, Poll};
+use futures::future;
 
 use Error;
+
+pub type Finished<S, T> = future::Finished<(S, T), Error<S>>;
 
 #[derive(Debug)]
 pub struct WithState<F, T> {
@@ -61,6 +64,29 @@ where
         Ok(match *self {
             Phase2::A(ref mut f) => track!(f.poll())?.map(Phase2::A),
             Phase2::B(ref mut f) => track!(f.poll())?.map(Phase2::B),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum Phase3<A, B, C> {
+    A(A),
+    B(B),
+    C(C),
+}
+impl<S, A, B, C> Future for Phase3<A, B, C>
+where
+    A: Future<Error = Error<S>>,
+    B: Future<Error = Error<S>>,
+    C: Future<Error = Error<S>>,
+{
+    type Item = Phase3<A::Item, B::Item, C::Item>;
+    type Error = Error<S>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(match *self {
+            Phase3::A(ref mut f) => track!(f.poll())?.map(Phase3::A),
+            Phase3::B(ref mut f) => track!(f.poll())?.map(Phase3::B),
+            Phase3::C(ref mut f) => track!(f.poll())?.map(Phase3::C),
         })
     }
 }

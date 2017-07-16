@@ -21,8 +21,11 @@ where
     F: Decode<R>,
 {
     pub fn new(reader: R) -> Self {
+        Self::with_future(F::decode(reader))
+    }
+    pub fn with_future(future: F::Future) -> Self {
         DecodeInto {
-            future: F::decode(reader),
+            future,
             _phantom: PhantomData,
         }
     }
