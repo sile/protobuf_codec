@@ -3,7 +3,8 @@ use std::io::{Read, Write};
 use futures::Future;
 
 use {Result, Error};
-use future::decode::{DecodeInto, DecodeTryInto};
+use future::decode::{DecodeInto, DecodeTryInto, DecodeMessage};
+use future::encode::EncodeMessage;
 use wire::WireType;
 
 pub trait Tag: Default {
@@ -21,7 +22,23 @@ pub trait Field: Default {}
 
 pub trait SingularField: Field {}
 
-pub trait Message: Default {}
+pub trait Message: Sized + Default {
+    type Base: Message;
+    fn from_base(base: Self::Base) -> Result<Self>;
+    fn into_base(self) -> Self::Base;
+    fn encode_message<W: Write>(self, writer: W) -> EncodeMessage<W, Self>
+    where
+        Self::Base: Encode<W>,
+    {
+        EncodeMessage::new(writer, self)
+    }
+    fn decode_message<R: Read>(reader: R) -> DecodeMessage<R, Self>
+    where
+        Self::Base: Decode<R>,
+    {
+        DecodeMessage::new(reader)
+    }
+}
 
 pub trait Encode<W: Write>: Sized {
     type Future: Future<Item = W, Error = Error<W>>;

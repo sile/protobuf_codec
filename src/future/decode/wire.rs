@@ -1,9 +1,10 @@
-use std::io::{Read, Take};
+use std::io::{self, Read, Take};
 use futures::{Future, Poll, Async};
 
 use {Error, ErrorKind, Decode};
-use future::read::ReadByte;
-use future::util::{UnwrapTake, Phase2};
+use future::read::{ReadByte, ReadBytes};
+use future::util::{UnwrapTake, Phase2, Phase4};
+use wire::WireType;
 use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
 use super::convert::DecodeInto;
 
@@ -126,80 +127,77 @@ where
     }
 }
 
-// #[derive(Debug)]
-// pub struct DiscardWireValue<R: Read> {
-//     phase: Phase4<
-//         DecodeVarint<R>,
-//         ReadBytes<R, [u8; 4]>,
-//         ReadBytes<R, [u8; 8]>,
-//         DecodeLengthDelimited<R, Null>,
-//     >,
-// }
-// impl<R: Read> DiscardWireValue<R> {
-//     pub fn new(reader: R, wire_type: WireType) -> Self {
-//         let phase = match wire_type {
-//             WireType::Varint => Phase4::A(DecodeVarint::new(reader)),
-//             WireType::Bit32 => Phase4::B(ReadBytes::new(reader, [0; 4])),
-//             WireType::Bit64 => Phase4::C(ReadBytes::new(reader, [0; 8])),
-//             WireType::LengthDelimited => Phase4::D(LengthDelimited::<Null>::decode(reader)),
-//         };
-//         DiscardWireValue { phase }
-//     }
-// }
-// impl<R: Read> Future for DiscardWireValue<R> {
-//     type Item = (R, ());
-//     type Error = Error<R>;
-//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//         if let Async::Ready(phase) = track!(self.phase.poll())? {
-//             Ok(Async::Ready(match phase {
-//                 Phase4::A((r, _)) => (r, ()),
-//                 Phase4::B((r, _)) => (r, ()),
-//                 Phase4::C((r, _)) => (r, ()),
-//                 Phase4::D((r, _)) => (r, ()),
-//             }))
-//         } else {
-//             Ok(Async::NotReady)
-//         }
-//     }
-// }
+#[derive(Debug)]
+pub struct DiscardWireValue<R: Read> {
+    phase: Phase4<
+        DecodeVarint<R>,
+        ReadBytes<R, [u8; 4]>,
+        ReadBytes<R, [u8; 8]>,
+        DecodeLengthDelimited<R, Null>,
+    >,
+}
+impl<R: Read> DiscardWireValue<R> {
+    pub fn new(reader: R, wire_type: WireType) -> Self {
+        let phase = match wire_type {
+            WireType::Varint => Phase4::A(DecodeVarint::new(reader)),
+            WireType::Bit32 => Phase4::B(ReadBytes::new(reader, [0; 4])),
+            WireType::Bit64 => Phase4::C(ReadBytes::new(reader, [0; 8])),
+            WireType::LengthDelimited => Phase4::D(LengthDelimited::<Null>::decode(reader)),
+        };
+        DiscardWireValue { phase }
+    }
+}
+impl<R: Read> Future for DiscardWireValue<R> {
+    type Item = R;
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready(phase) = track!(self.phase.poll())? {
+            Ok(Async::Ready(match phase {
+                Phase4::A((r, _)) => r,
+                Phase4::B((r, _)) => r,
+                Phase4::C((r, _)) => r,
+                Phase4::D((r, _)) => r,
+            }))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
 
-// #[derive(Debug)]
-// struct Null;
-// impl Pattern for Null {
-//     type Value = ();
-// }
-// impl<R: Read> Decode<R> for Null {
-//     type Future = DiscardAllBytes<R>;
-//     fn decode(reader: R) -> Self::Future {
-//         DiscardAllBytes { reader: Some(reader) }
-//     }
-// }
+#[derive(Debug)]
+struct Null;
+impl<R: Read> Decode<R> for Null {
+    type Future = DiscardAllBytes<R>;
+    fn decode(reader: R) -> Self::Future {
+        DiscardAllBytes { reader: Some(reader) }
+    }
+}
 
-// #[derive(Debug)]
-// struct DiscardAllBytes<R> {
-//     reader: Option<R>,
-// }
-// impl<R: Read> Future for DiscardAllBytes<R> {
-//     type Item = (R, ());
-//     type Error = Error<R>;
-//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//         let mut reader = self.reader.take().expect(
-//             "Cannot poll DiscardAllBytes twice",
-//         );
-//         let mut buf = [0; 1024];
-//         loop {
-//             match reader.read(&mut buf) {
-//                 Err(e) => {
-//                     if e.kind() == io::ErrorKind::WouldBlock {
-//                         self.reader = Some(reader);
-//                         return Ok(Async::NotReady);
-//                     }
-//                     failed_by_error!(reader, ErrorKind::Other, e);
-//                 }
-//                 Ok(0) => break,
-//                 Ok(_) => {}
-//             }
-//         }
-//         Ok(Async::Ready((reader, ())))
-//     }
-// }
+#[derive(Debug)]
+struct DiscardAllBytes<R> {
+    reader: Option<R>,
+}
+impl<R: Read> Future for DiscardAllBytes<R> {
+    type Item = (R, Null);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let mut reader = self.reader.take().expect(
+            "Cannot poll DiscardAllBytes twice",
+        );
+        let mut buf = [0; 1024];
+        loop {
+            match reader.read(&mut buf) {
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::WouldBlock {
+                        self.reader = Some(reader);
+                        return Ok(Async::NotReady);
+                    }
+                    failed_by_error!(reader, ErrorKind::Other, e);
+                }
+                Ok(0) => break,
+                Ok(_) => {}
+            }
+        }
+        Ok(Async::Ready((reader, Null)))
+    }
+}
