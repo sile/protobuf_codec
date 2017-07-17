@@ -1,4 +1,4 @@
-use traits::{self, Tag, FieldType, SingularField};
+use traits::{self, Tag, FieldType, SingularField, Map};
 use variants;
 
 #[derive(Debug, Default)]
@@ -46,6 +46,13 @@ impl<T: Tag, V: FieldType> From<Vec<V>> for PackedRepeatedField<T, V> {
         }
     }
 }
+
+#[derive(Debug, Default)]
+pub struct MapField<T: Tag, M: Map> {
+    pub tag: T,
+    pub map: M,
+}
+impl<T: Tag, M: Map> traits::Field for MapField<T, M> {}
 
 macro_rules! define_oneof {
     ($name:ident, $variant:ident, $($param:ident),*) => {
