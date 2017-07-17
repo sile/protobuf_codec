@@ -1,10 +1,10 @@
 pbcodec
 =======
 
-[![pdcodec](http://meritbadge.herokuapp.com/pdcodec)](https://crates.io/crates/pdcodec)
-[![Documentation](https://docs.rs/pdcodec/badge.svg)](https://docs.rs/pdcodec)
-[![Build Status](https://travis-ci.org/sile/pdcodec.svg?branch=master)](https://travis-ci.org/sile/pdcodec)
-[![Code Coverage](https://codecov.io/gh/sile/pdcodec/branch/master/graph/badge.svg)](https://codecov.io/gh/sile/pdcodec/branch/master)
+[![pbcodec](http://meritbadge.herokuapp.com/pbcodec)](https://crates.io/crates/pbcodec)
+[![Documentation](https://docs.rs/pbcodec/badge.svg)](https://docs.rs/pbcodec)
+[![Build Status](https://travis-ci.org/sile/pbcodec.svg?branch=master)](https://travis-ci.org/sile/pbcodec)
+[![Code Coverage](https://codecov.io/gh/sile/pbcodec/branch/master/graph/badge.svg)](https://codecov.io/gh/sile/pbcodec/branch/master)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Rust implementation of asynchronous encoder/decoder for Protocol Buffers (version 3).
