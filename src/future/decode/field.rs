@@ -8,7 +8,8 @@ use {Error, Decode};
 use future::decode::{DecodeInto, DecodeLengthDelimited};
 use future::util::Finished;
 use fields;
-use traits::{Tag, FieldType, Packable, DecodeField};
+use tags;
+use traits::{Tag, FieldType, Packable, DecodeField, Map};
 use wire::WireType;
 use wire::types::LengthDelimited;
 
@@ -192,5 +193,97 @@ impl<R: Read, F: Decode<Take<R>>> Future for DecodePacked<R, F> {
             self.future = F::decode(r);
         }
         Ok(Async::NotReady)
+    }
+}
+
+pub struct DecodeMapField<R, T, M>
+where
+    R: Read,
+    M: Map + Decode<R>,
+    M::Key: Decode<Take<R>>,
+    M::Value: Decode<Take<R>>,
+{
+    future: DecodeMapEntry<R, M>,
+    map: M,
+    _phantom: PhantomData<T>,
+}
+impl<R, T, M> Future for DecodeMapField<R, T, M>
+where
+    R: Read,
+    T: Tag,
+    M: Map + Decode<R>,
+    M::Key: Decode<Take<R>>,
+    M::Value: Decode<Take<R>>,
+{
+    type Item = (R, fields::MapField<T, M>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Async::Ready((r, k, v)) = track!(self.future.poll())? {
+            self.map.insert(k, v);
+            let f = fields::MapField {
+                tag: T::default(),
+                map: mem::replace(&mut self.map, Default::default()),
+            };
+            Ok(Async::Ready((r, f)))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+impl<R, T, M> DecodeField<R> for fields::MapField<T, M>
+where
+    R: Read,
+    T: Tag,
+    M: Map + Decode<R>,
+    M::Key: Decode<Take<R>>,
+    M::Value: Decode<Take<R>>,
+{
+    type Future = DecodeMapField<R, T, M>;
+    fn is_target(tag: u32) -> bool {
+        tag == T::number()
+    }
+    fn decode_field(
+        self,
+        reader: R,
+        tag: u32,
+        wire_type: WireType,
+    ) -> Result<Self::Future, Error<R>> {
+        assert_eq!(tag, T::number());
+        track_assert_wire_type!(reader, wire_type, WireType::LengthDelimited);
+        let future = LengthDelimited::decode(reader);
+        Ok(DecodeMapField {
+            future: DecodeMapEntry { future },
+            map: self.map,
+            _phantom: PhantomData,
+        })
+    }
+}
+
+struct DecodeMapEntry<R, M>
+where
+    R: Read,
+    M: Map,
+    M::Key: Decode<Take<R>>,
+    M::Value: Decode<Take<R>>,
+{
+    future: DecodeLengthDelimited<
+        R,
+        (fields::Field<tags::Tag1, M::Key>,
+         fields::Field<tags::Tag2, M::Value>),
+    >,
+}
+impl<R, M> Future for DecodeMapEntry<R, M>
+where
+    R: Read,
+    M: Map,
+    M::Key: Decode<Take<R>>,
+    M::Value: Decode<Take<R>>,
+{
+    type Item = (R, M::Key, M::Value);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(track!(self.future.poll())?.map(|(r, v)| {
+            (r, (v.0).0.value, (v.0).1.value)
+        }))
     }
 }

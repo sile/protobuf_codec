@@ -4,7 +4,9 @@ use futures::future::{Either, Finished};
 
 use {Encode, Error};
 use fields;
-use traits::{Tag, FieldType, Packable};
+use tags;
+use traits::{Tag, FieldType, Packable, Map};
+use types::Embedded;
 use future::util::{Phase2, Phase3, WithState};
 use wire::WireType;
 use wire::types::Varint;
@@ -169,5 +171,96 @@ where
     fn encoded_size(&self) -> u64 {
         let key_size = <Varint as Encode<W>>::encoded_size(&Varint((T::number() as u64) << 3));
         key_size + self.values.iter().map(F::encoded_size).sum::<u64>()
+    }
+}
+
+pub struct EncodeMapField<W, T>
+where
+    W: Write,
+    T: Map,
+    T::Key: Encode<W>,
+    T::Value: Encode<W>,
+{
+    tag: u32,
+    pairs: T::IntoIter,
+    future: Either<
+        EncodeField<
+            W,
+            Embedded<
+                (fields::Field<tags::Tag1, T::Key>,
+                 fields::Field<tags::Tag2, T::Value>),
+            >,
+        >,
+        Finished<W, Error<W>>,
+    >,
+}
+impl<W: Write, T: Map> EncodeMapField<W, T>
+where
+    T::Key: Encode<W>,
+    T::Value: Encode<W>,
+{
+    fn new(writer: W, tag: u32, map: T) -> Self {
+        let mut pairs = map.into_iter();
+        let future = if let Some((k, v)) = pairs.next() {
+            let field = Embedded::new((k.into(), v.into()));
+            Either::A(EncodeField::new(
+                writer,
+                tag,
+                WireType::LengthDelimited,
+                field,
+            ))
+        } else {
+            Either::B(futures::finished(writer))
+        };
+        EncodeMapField { tag, pairs, future }
+    }
+}
+impl<W: Write, T: Map> Future for EncodeMapField<W, T>
+where
+    T::Key: Encode<W>,
+    T::Value: Encode<W>,
+{
+    type Item = W;
+    type Error = Error<W>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        while let Async::Ready(w) = track!(self.future.poll())? {
+            if let Some((k, v)) = self.pairs.next() {
+                let field = Embedded::new((k.into(), v.into()));
+                let future = Either::A(EncodeField::new(
+                    w,
+                    self.tag,
+                    WireType::LengthDelimited,
+                    field,
+                ));
+                self.future = future;
+            } else {
+                return Ok(Async::Ready(w));
+            }
+        }
+        Ok(Async::NotReady)
+    }
+}
+impl<W, T, M> Encode<W> for fields::MapField<T, M>
+where
+    W: Write,
+    T: Tag,
+    M: Map,
+    M::Key: Encode<W>,
+    M::Value: Encode<W>,
+{
+    type Future = EncodeMapField<W, M>;
+    fn encode(self, writer: W) -> Self::Future {
+        EncodeMapField::new(writer, T::number(), self.map)
+    }
+    fn encoded_size(&self) -> u64 {
+        let tag_size = Encode::<W>::encoded_size(&Varint((T::number() as u64) << 3));
+        self.map
+            .iter()
+            .map(|(k, v)| {
+                let entry_size = 1 + k.encoded_size() + 1 + v.encoded_size();
+                let length_size = Encode::<W>::encoded_size(&Varint(entry_size));
+                tag_size + length_size + entry_size
+            })
+            .sum()
     }
 }

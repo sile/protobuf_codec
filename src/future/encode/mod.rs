@@ -1,4 +1,4 @@
-pub use self::field::{EncodeField, EncodeRepeatedField, EncodePackedRepeatedField};
+pub use self::field::{EncodeField, EncodeRepeatedField, EncodePackedRepeatedField, EncodeMapField};
 pub use self::message::{EncodeMessage, EncodeEmbeddedMessage, EncodeTupleMessage1,
                         EncodeTupleMessage2, EncodeTupleMessage3, EncodeTupleMessage4,
                         EncodeTupleMessage5, EncodeTupleMessage6, EncodeTupleMessage7,

@@ -1,5 +1,5 @@
 pub use self::convert::{DecodeInto, DecodeTryInto};
-pub use self::field::{DecodeRepeatedField, DecodePackedRepeatedField};
+pub use self::field::{DecodeRepeatedField, DecodePackedRepeatedField, DecodeMapField};
 pub use self::message::{DecodeMessage, DecodeTupleMessage1, DecodeTupleMessage2,
                         DecodeTupleMessage3, DecodeTupleMessage4, DecodeTupleMessage5,
                         DecodeTupleMessage6, DecodeTupleMessage7, DecodeTupleMessage8};

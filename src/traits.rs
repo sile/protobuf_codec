@@ -16,7 +16,7 @@ pub trait FieldType: Default {
     fn wire_type() -> WireType;
 }
 
-pub trait MapKey: Default {}
+pub trait MapKey: Default + FieldType {}
 
 pub trait Map: Default {
     type Key: MapKey;
@@ -24,6 +24,7 @@ pub trait Map: Default {
     type IntoIter: Iterator<Item = (Self::Key, Self::Value)>;
     fn insert(&mut self, key: Self::Key, value: Self::Value);
     fn into_iter(self) -> Self::IntoIter;
+    fn iter<'a>(&'a self) -> Box<Iterator<Item = (&'a Self::Key, &'a Self::Value)> + 'a>;
 }
 
 pub trait Packable: FieldType {}

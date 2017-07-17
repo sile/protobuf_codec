@@ -3,7 +3,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use trackable::error::ErrorKindExt;
 
 use {Result, ErrorKind};
-use traits::{FieldType, TryFrom, Message, Packable};
+use traits::{FieldType, TryFrom, Message, Packable, MapKey};
 use wire::WireType;
 use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
 
@@ -42,6 +42,7 @@ impl TryFrom<Varint> for Bool {
         Ok(Bool(f.0 != 0))
     }
 }
+impl MapKey for Bool {}
 
 #[derive(Debug, Default)]
 pub struct Int32(pub i32);
@@ -65,6 +66,7 @@ impl TryFrom<Varint> for Int32 {
         Ok(Int32(f.0 as i32))
     }
 }
+impl MapKey for Int32 {}
 
 #[derive(Debug, Default)]
 pub struct Int64(pub i64);
@@ -75,6 +77,7 @@ impl From<Varint> for Int64 {
         Int64(f.0 as i64)
     }
 }
+impl MapKey for Int64 {}
 
 #[derive(Debug, Default)]
 pub struct Uint32(pub u32);
@@ -91,6 +94,7 @@ impl TryFrom<Varint> for Uint32 {
         Ok(Uint32(f.0 as u32))
     }
 }
+impl MapKey for Uint32 {}
 
 #[derive(Debug, Default)]
 pub struct Uint64(pub u64);
@@ -101,6 +105,7 @@ impl From<Varint> for Uint64 {
         Uint64(f.0)
     }
 }
+impl MapKey for Uint64 {}
 
 #[derive(Debug, Default)]
 pub struct Sint32(pub i32);
@@ -124,6 +129,7 @@ impl TryFrom<Varint> for Sint32 {
         Ok(Sint32(n as i32))
     }
 }
+impl MapKey for Sint32 {}
 
 #[derive(Debug, Default)]
 pub struct Sint64(pub i64);
@@ -135,6 +141,7 @@ impl From<Varint> for Sint64 {
         Sint64(n)
     }
 }
+impl MapKey for Sint64 {}
 
 #[derive(Debug, Default)]
 pub struct Fixed32(pub u32);
@@ -145,6 +152,7 @@ impl From<Bit32> for Fixed32 {
         Fixed32(LittleEndian::read_u32(&f.0[..]))
     }
 }
+impl MapKey for Fixed32 {}
 
 #[derive(Debug, Default)]
 pub struct Fixed64(pub u64);
@@ -155,6 +163,7 @@ impl From<Bit64> for Fixed64 {
         Fixed64(LittleEndian::read_u64(&f.0[..]))
     }
 }
+impl MapKey for Fixed64 {}
 
 #[derive(Debug, Default)]
 pub struct Sfixed32(pub i32);
@@ -165,6 +174,7 @@ impl From<Bit32> for Sfixed32 {
         Sfixed32(LittleEndian::read_i32(&f.0[..]))
     }
 }
+impl MapKey for Sfixed32 {}
 
 #[derive(Debug, Default)]
 pub struct Sfixed64(pub i64);
@@ -175,6 +185,7 @@ impl From<Bit64> for Sfixed64 {
         Sfixed64(LittleEndian::read_i64(&f.0[..]))
     }
 }
+impl MapKey for Sfixed64 {}
 
 #[derive(Debug, Default)]
 pub struct Float(pub f32);
@@ -215,9 +226,18 @@ impl TryFrom<Bytes> for Str {
         })
     }
 }
+impl MapKey for Str {}
 
 #[derive(Debug, Default)]
 pub struct Embedded<T: Message>(pub(crate) T::Base);
+impl<T: Message> Embedded<T> {
+    pub fn new(message: T) -> Self {
+        Embedded(message.into_base())
+    }
+    pub fn unwrap(self) -> Result<T> {
+        T::from_base(self.0)
+    }
+}
 impl<T: Message> FieldType for Embedded<T> {
     fn wire_type() -> WireType {
         WireType::LengthDelimited
