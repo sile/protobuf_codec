@@ -5,6 +5,9 @@ use futures::{Future, Poll, Async};
 use {Encode, Message, Error};
 use future::util;
 use traits::Field;
+use types::Embedded;
+use wire::types::{Varint, LengthDelimited};
+use super::EncodeLengthDelimited;
 
 pub struct EncodeMessage<W, T>
 where
@@ -31,6 +34,41 @@ where
     type Error = Error<W>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         track!(self.future.poll())
+    }
+}
+
+pub struct EncodeEmbeddedMessage<W, T>
+where
+    W: Write,
+    T: Message,
+    T::Base: Encode<W>,
+{
+    future: EncodeLengthDelimited<W, T::Base>,
+}
+impl<W, T> Future for EncodeEmbeddedMessage<W, T>
+where
+    W: Write,
+    T: Message,
+    T::Base: Encode<W>,
+{
+    type Item = W;
+    type Error = Error<W>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        track!(self.future.poll())
+    }
+}
+impl<W: Write, T: Message> Encode<W> for Embedded<T>
+where
+    T::Base: Encode<W>,
+{
+    type Future = EncodeEmbeddedMessage<W, T>;
+    fn encode(self, writer: W) -> Self::Future {
+        let future = LengthDelimited(self.0).encode(writer);
+        EncodeEmbeddedMessage { future }
+    }
+    fn encoded_size(&self) -> u64 {
+        let size = self.0.encoded_size();
+        Encode::<W>::encoded_size(&Varint(size)) + size
     }
 }
 

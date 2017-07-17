@@ -1,12 +1,14 @@
-use std::io::Read;
+use std::io::{Read, Take};
 use std::mem;
 use futures::{Future, Poll, Async};
 
 use {Decode, Message, Error, ErrorKind};
-use future::decode::{DecodeMaybeVarint, DiscardWireValue};
+use future::decode::{DecodeMaybeVarint, DiscardWireValue, DecodeLengthDelimited};
 use future::util::{self, Phase3};
 use traits::DecodeField;
+use types::Embedded;
 use wire::WireType;
+use wire::types::LengthDelimited;
 
 pub struct DecodeMessage<R, T>
 where
@@ -43,6 +45,39 @@ where
         } else {
             Ok(Async::NotReady)
         }
+    }
+}
+
+pub struct DecodeEmbeddedMessage<R, T>
+where
+    R: Read,
+    T: Message,
+    T::Base: Decode<Take<R>>,
+{
+    future: DecodeLengthDelimited<R, T::Base>,
+}
+impl<R, T> Future for DecodeEmbeddedMessage<R, T>
+where
+    R: Read,
+    T: Message,
+    T::Base: Decode<Take<R>>,
+{
+    type Item = (R, Embedded<T>);
+    type Error = Error<R>;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        Ok(track!(self.future.poll())?.map(|(r, t)| (r, Embedded(t.0))))
+    }
+}
+impl<R, T> Decode<R> for Embedded<T>
+where
+    R: Read,
+    T: Message,
+    T::Base: Decode<Take<R>>,
+{
+    type Future = DecodeEmbeddedMessage<R, T>;
+    fn decode(reader: R) -> Self::Future {
+        let future = LengthDelimited::decode(reader);
+        DecodeEmbeddedMessage { future }
     }
 }
 

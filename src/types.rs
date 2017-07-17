@@ -217,7 +217,7 @@ impl TryFrom<Bytes> for Str {
 }
 
 #[derive(Debug, Default)]
-pub struct Embedded<T: Message>(pub T);
+pub struct Embedded<T: Message>(pub(crate) T::Base);
 impl<T: Message> FieldType for Embedded<T> {
     fn wire_type() -> WireType {
         WireType::LengthDelimited
@@ -225,6 +225,6 @@ impl<T: Message> FieldType for Embedded<T> {
 }
 impl<T: Message> From<T> for Embedded<T> {
     fn from(f: T) -> Self {
-        Embedded(f)
+        Embedded(f.into_base())
     }
 }
