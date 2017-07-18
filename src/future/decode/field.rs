@@ -199,7 +199,7 @@ impl<R: Read, F: Decode<Take<R>>> Future for DecodePacked<R, F> {
 pub struct DecodeMapField<R, T, M>
 where
     R: Read,
-    M: Map + Decode<R>,
+    M: Map,
     M::Key: Decode<Take<R>>,
     M::Value: Decode<Take<R>>,
 {
@@ -211,7 +211,7 @@ impl<R, T, M> Future for DecodeMapField<R, T, M>
 where
     R: Read,
     T: Tag,
-    M: Map + Decode<R>,
+    M: Map,
     M::Key: Decode<Take<R>>,
     M::Value: Decode<Take<R>>,
 {
@@ -234,7 +234,7 @@ impl<R, T, M> DecodeField<R> for fields::MapField<T, M>
 where
     R: Read,
     T: Tag,
-    M: Map + Decode<R>,
+    M: Map,
     M::Key: Decode<Take<R>>,
     M::Value: Decode<Take<R>>,
 {
