@@ -17,12 +17,12 @@ pub struct Error<T> {
     pub stream: T,
     pub error: TrackableError<ErrorKind>,
 }
-impl<R> std::fmt::Display for Error<R> {
+impl<T> std::fmt::Display for Error<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.error.fmt(f)
     }
 }
-impl<R: std::fmt::Debug> std::error::Error for Error<R> {
+impl<T: std::fmt::Debug> std::error::Error for Error<T> {
     fn description(&self) -> &str {
         self.error.description()
     }
@@ -30,7 +30,7 @@ impl<R: std::fmt::Debug> std::error::Error for Error<R> {
         self.error.cause()
     }
 }
-impl<R> trackable::Trackable for Error<R> {
+impl<T> trackable::Trackable for Error<T> {
     type Event = trackable::error::Event;
     fn assign_tracking_number(&mut self) {
         self.error.assign_tracking_number();
@@ -57,5 +57,10 @@ impl<R> trackable::Trackable for Error<R> {
     }
     fn history_mut(&mut self) -> Option<&mut trackable::History<Self::Event>> {
         self.error.history_mut()
+    }
+}
+impl<T> From<Error<T>> for TrackableError<ErrorKind> {
+    fn from(f: Error<T>) -> Self {
+        f.error
     }
 }
