@@ -1,6 +1,6 @@
 [package]
 name = "pbcodec"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "An asynchronous encoder/decoder for Protocol Buffers"
 homepage = "https://github.com/sile/pbcodec"
