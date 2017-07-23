@@ -216,7 +216,7 @@ impl From<LengthDelimited<Vec<u8>>> for Bytes {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Str(pub String);
 impl_scalar_type!(Str, String, LengthDelimited);
 impl TryFrom<Bytes> for Str {

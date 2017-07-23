@@ -26,6 +26,42 @@ pub trait Map: Default {
     fn into_iter(self) -> Self::IntoIter;
     fn iter<'a>(&'a self) -> Box<Iterator<Item = (&'a Self::Key, &'a Self::Value)> + 'a>;
 }
+impl<K, V> Map for std::collections::BTreeMap<K, V>
+where
+    K: MapKey + Ord,
+    V: FieldType,
+{
+    type Key = K;
+    type Value = V;
+    type IntoIter = std::collections::btree_map::IntoIter<K, V>;
+    fn insert(&mut self, key: Self::Key, value: Self::Value) {
+        std::collections::BTreeMap::insert(self, key, value);
+    }
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::IntoIterator::into_iter(self)
+    }
+    fn iter<'a>(&'a self) -> Box<Iterator<Item = (&'a Self::Key, &'a Self::Value)> + 'a> {
+        Box::new(std::collections::BTreeMap::iter(self))
+    }
+}
+impl<K, V> Map for std::collections::HashMap<K, V>
+where
+    K: MapKey + Eq + std::hash::Hash,
+    V: FieldType,
+{
+    type Key = K;
+    type Value = V;
+    type IntoIter = std::collections::hash_map::IntoIter<K, V>;
+    fn insert(&mut self, key: Self::Key, value: Self::Value) {
+        std::collections::HashMap::insert(self, key, value);
+    }
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::IntoIterator::into_iter(self)
+    }
+    fn iter<'a>(&'a self) -> Box<Iterator<Item = (&'a Self::Key, &'a Self::Value)> + 'a> {
+        Box::new(std::collections::HashMap::iter(self))
+    }
+}
 
 pub trait Packable: FieldType {}
 
