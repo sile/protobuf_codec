@@ -7,7 +7,7 @@ use fields;
 use tags;
 use traits::{Tag, FieldType, Packable, Map};
 use types::Embedded;
-use future::util::{Phase2, Phase3, WithState};
+use future::util::{Phase2, Phase4, WithState};
 use wire::WireType;
 use wire::types::Varint;
 use super::EncodeVarint;
@@ -125,16 +125,16 @@ where
     T: Encode<W>,
 {
     values: Vec<T>,
-    phase: Phase3<EncodeVarint<W>, T::Future, Finished<W, Error<W>>>,
+    phase: Phase4<EncodeVarint<W>, EncodeVarint<W>, T::Future, Finished<W, Error<W>>>,
 }
 impl<W: Write, T: Encode<W>> EncodePackedRepeatedField<W, T> {
-    fn new(writer: W, tag: u32, wire_type: WireType, mut values: Vec<T>) -> Self {
+    fn new(writer: W, tag: u32, mut values: Vec<T>) -> Self {
         values.reverse();
         let phase = if values.is_empty() {
-            Phase3::C(futures::finished(writer))
+            Phase4::D(futures::finished(writer))
         } else {
-            let n = (tag << 3) as u64 | wire_type as u64;
-            Phase3::A(Varint(n).encode(writer))
+            let n = (tag << 3) as u64 | WireType::LengthDelimited as u64;
+            Phase4::A(Varint(n).encode(writer))
         };
         EncodePackedRepeatedField { values, phase }
     }
@@ -145,12 +145,17 @@ impl<W: Write, T: Encode<W>> Future for EncodePackedRepeatedField<W, T> {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         while let Async::Ready(phase) = track!(self.phase.poll())? {
             let w = match phase {
-                Phase3::A(w) => w,
-                Phase3::B(w) => w,
-                Phase3::C(w) => w,
+                Phase4::A(w) => {
+                    let values_size = self.values.iter().map(T::encoded_size).sum::<u64>();
+                    self.phase = Phase4::B(Varint(values_size).encode(w));
+                    continue;
+                }
+                Phase4::B(w) => w,
+                Phase4::C(w) => w,
+                Phase4::D(w) => w,
             };
             if let Some(v) = self.values.pop() {
-                self.phase = Phase3::B(v.encode(w));
+                self.phase = Phase4::C(v.encode(w));
             } else {
                 return Ok(Async::Ready(w));
             }
@@ -166,11 +171,13 @@ where
 {
     type Future = EncodePackedRepeatedField<W, F>;
     fn encode(self, writer: W) -> Self::Future {
-        EncodePackedRepeatedField::new(writer, T::number(), F::wire_type(), self.values)
+        EncodePackedRepeatedField::new(writer, T::number(), self.values)
     }
     fn encoded_size(&self) -> u64 {
-        let key_size = <Varint as Encode<W>>::encoded_size(&Varint((T::number() as u64) << 3));
-        key_size + self.values.iter().map(F::encoded_size).sum::<u64>()
+        let header_size = <Varint as Encode<W>>::encoded_size(&Varint((T::number() as u64) << 3));
+        let values_size = self.values.iter().map(F::encoded_size).sum::<u64>();
+        let length_size = Encode::<W>::encoded_size(&Varint(values_size));
+        header_size + length_size + values_size
     }
 }
 
