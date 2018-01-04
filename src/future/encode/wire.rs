@@ -32,7 +32,7 @@ pub struct EncodeVarint<W> {
     future: WriteByte<W>,
 }
 impl<W> EncodeVarint<W> {
-    fn new(writer: W, value: Varint) -> Self {
+    fn new(writer: W, value: &Varint) -> Self {
         let mut value = value.0;
         let mut b = value & 0b0111_1111;
         value >>= 7;
@@ -64,7 +64,7 @@ impl<W: Write> Future for EncodeVarint<W> {
 impl<W: Write> Encode<W> for Varint {
     type Future = EncodeVarint<W>;
     fn encode(self, writer: W) -> Self::Future {
-        EncodeVarint::new(writer, self)
+        EncodeVarint::new(writer, &self)
     }
     fn encoded_size(&self) -> u64 {
         for i in 1.. {

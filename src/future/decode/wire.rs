@@ -42,7 +42,7 @@ impl<R: Read> Future for DecodeVarint<R> {
     type Error = Error<R>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         while let Async::Ready((r, b)) = track!(self.future.poll())? {
-            self.value += ((b & 0b0111_1111) as u64) << self.bits;
+            self.value += u64::from(b & 0b0111_1111) << self.bits;
             self.bits += 7;
             let is_last = (b >> 7) == 0;
             if is_last {
@@ -153,10 +153,7 @@ impl<R: Read> Future for DiscardWireValue<R> {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Async::Ready(phase) = track!(self.phase.poll())? {
             Ok(Async::Ready(match phase {
-                Phase4::A((r, _)) => r,
-                Phase4::B((r, _)) => r,
-                Phase4::C((r, _)) => r,
-                Phase4::D((r, _)) => r,
+                Phase4::A((r, _)) | Phase4::B((r, _)) | Phase4::C((r, _)) | Phase4::D((r, _)) => r,
             }))
         } else {
             Ok(Async::NotReady)

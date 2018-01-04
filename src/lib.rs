@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "cargo-clippy", allow(type_complexity, useless_format, never_loop))]
+
 extern crate byteorder;
 extern crate futures;
 #[macro_use]

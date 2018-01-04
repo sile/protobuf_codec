@@ -52,13 +52,13 @@ impl TryFrom<Varint> for Int32 {
     fn try_from(f: Varint) -> Result<Self> {
         let n = f.0 as i64;
         track_assert!(
-            n >= std::i32::MIN as i64,
+            n >= i64::from(std::i32::MIN),
             ErrorKind::Invalid,
             "Tool small `int32` value: {}",
             n
         );
         track_assert!(
-            n <= std::i32::MAX as i64,
+            n <= i64::from(std::i32::MAX),
             ErrorKind::Invalid,
             "Tool large `int32` value: {}",
             n
@@ -86,7 +86,7 @@ impl Packable for Uint32 {}
 impl TryFrom<Varint> for Uint32 {
     fn try_from(f: Varint) -> Result<Self> {
         track_assert!(
-            f.0 <= std::u32::MAX as u64,
+            f.0 <= u64::from(std::u32::MAX),
             ErrorKind::Invalid,
             "Tool large `uint32` value: {}",
             f.0
@@ -115,13 +115,13 @@ impl TryFrom<Varint> for Sint32 {
     fn try_from(f: Varint) -> Result<Self> {
         let n = ((f.0 << 63) | (f.0 >> 1)) as i64;
         track_assert!(
-            n >= std::i32::MIN as i64,
+            n >= i64::from(std::i32::MIN),
             ErrorKind::Invalid,
             "Tool small `int32` value: {}",
             n
         );
         track_assert!(
-            n <= std::i32::MAX as i64,
+            n <= i64::from(std::i32::MAX),
             ErrorKind::Invalid,
             "Tool large `int32` value: {}",
             n

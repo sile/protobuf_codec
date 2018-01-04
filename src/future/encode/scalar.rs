@@ -20,10 +20,10 @@ impl<W: Write> Encode<W> for types::Bool {
 impl<W: Write> Encode<W> for types::Uint32 {
     type Future = EncodeVarint<W>;
     fn encode(self, writer: W) -> Self::Future {
-        Varint(self.0 as u64).encode(writer)
+        Varint(u64::from(self.0)).encode(writer)
     }
     fn encoded_size(&self) -> u64 {
-        Encode::<W>::encoded_size(&Varint(self.0 as u64))
+        Encode::<W>::encoded_size(&Varint(u64::from(self.0)))
     }
 }
 
@@ -62,12 +62,12 @@ impl<W: Write> Encode<W> for types::Sint32 {
     fn encode(self, writer: W) -> Self::Future {
         let n = self.0 as u32;
         let n = (n << 1) | (n >> 31);
-        Varint(n as u64).encode(writer)
+        Varint(u64::from(n)).encode(writer)
     }
     fn encoded_size(&self) -> u64 {
         let n = self.0 as u32;
         let n = (n << 1) | (n >> 31);
-        Encode::<W>::encoded_size(&Varint(n as u64))
+        Encode::<W>::encoded_size(&Varint(u64::from(n)))
     }
 }
 

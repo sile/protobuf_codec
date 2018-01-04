@@ -22,7 +22,7 @@ where
 }
 impl<W: Write, T: Encode<W>> EncodeField<W, T> {
     fn new(writer: W, tag: u32, wire_type: WireType, value: T) -> Self {
-        let n = (tag << 3) as u64 | wire_type as u64;
+        let n = u64::from(tag << 3) | wire_type as u64;
         let phase = Phase2::A(WithState::new(Varint(n).encode(writer), value));
         EncodeField { phase }
     }
@@ -52,7 +52,7 @@ where
         EncodeField::new(writer, T::number(), F::wire_type(), self.value)
     }
     fn encoded_size(&self) -> u64 {
-        let key_size = Encode::<W>::encoded_size(&Varint((T::number() as u64) << 3));
+        let key_size = Encode::<W>::encoded_size(&Varint(u64::from(T::number()) << 3));
         let value_size = self.value.encoded_size();
         key_size + value_size
     }
@@ -110,7 +110,7 @@ where
         EncodeRepeatedField::new(writer, T::number(), F::wire_type(), self.values)
     }
     fn encoded_size(&self) -> u64 {
-        let key_size = Encode::<W>::encoded_size(&Varint((T::number() as u64) << 3));
+        let key_size = Encode::<W>::encoded_size(&Varint(u64::from(T::number()) << 3));
         self.values
             .iter()
             .map(|v| key_size + v.encoded_size())
@@ -133,7 +133,7 @@ impl<W: Write, T: Encode<W>> EncodePackedRepeatedField<W, T> {
         let phase = if values.is_empty() {
             Phase4::D(futures::finished(writer))
         } else {
-            let n = (tag << 3) as u64 | WireType::LengthDelimited as u64;
+            let n = u64::from(tag << 3) | WireType::LengthDelimited as u64;
             Phase4::A(Varint(n).encode(writer))
         };
         EncodePackedRepeatedField { values, phase }
@@ -150,9 +150,7 @@ impl<W: Write, T: Encode<W>> Future for EncodePackedRepeatedField<W, T> {
                     self.phase = Phase4::B(Varint(values_size).encode(w));
                     continue;
                 }
-                Phase4::B(w) => w,
-                Phase4::C(w) => w,
-                Phase4::D(w) => w,
+                Phase4::B(w) | Phase4::C(w) | Phase4::D(w) => w,
             };
             if let Some(v) = self.values.pop() {
                 self.phase = Phase4::C(v.encode(w));
@@ -174,7 +172,7 @@ where
         EncodePackedRepeatedField::new(writer, T::number(), self.values)
     }
     fn encoded_size(&self) -> u64 {
-        let header_size = <Varint as Encode<W>>::encoded_size(&Varint((T::number() as u64) << 3));
+        let header_size = <Varint as Encode<W>>::encoded_size(&Varint(u64::from(T::number()) << 3));
         let values_size = self.values.iter().map(F::encoded_size).sum::<u64>();
         let length_size = Encode::<W>::encoded_size(&Varint(values_size));
         header_size + length_size + values_size
@@ -262,7 +260,7 @@ where
         EncodeMapField::new(writer, T::number(), self.map)
     }
     fn encoded_size(&self) -> u64 {
-        let tag_size = Encode::<W>::encoded_size(&Varint((T::number() as u64) << 3));
+        let tag_size = Encode::<W>::encoded_size(&Varint(u64::from(T::number()) << 3));
         self.map
             .iter()
             .map(|(k, v)| {

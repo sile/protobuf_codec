@@ -1,7 +1,6 @@
 //! Wire Value Types.
 //!
-//! https://developers.google.com/protocol-buffers/docs/encoding#structure
-
+//! [protocol-buffers/encoding#structure](https://developers.google.com/protocol-buffers/docs/encoding#structure)
 #[derive(Debug)]
 pub struct Varint(pub u64);
 impl From<u64> for Varint {
