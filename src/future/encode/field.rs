@@ -1,11 +1,11 @@
 use std::io::Write;
-use futures::{self, Future, Poll, Async};
+use futures::{self, Async, Future, Poll};
 use futures::future::{Either, Finished};
 
 use {Encode, Error};
 use fields;
 use tags;
-use traits::{Tag, FieldType, Packable, Map};
+use traits::{FieldType, Map, Packable, Tag};
 use types::Embedded;
 use future::util::{Phase2, Phase4, WithState};
 use wire::WireType;
@@ -194,8 +194,10 @@ where
         EncodeField<
             W,
             Embedded<
-                (fields::Field<tags::Tag1, T::Key>,
-                 fields::Field<tags::Tag2, T::Value>),
+                (
+                    fields::Field<tags::Tag1, T::Key>,
+                    fields::Field<tags::Tag2, T::Value>,
+                ),
             >,
         >,
         Finished<W, Error<W>>,

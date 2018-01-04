@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use Decode;
-use future::read::{ReadBytes, ReadAllBytes};
+use future::read::{ReadAllBytes, ReadBytes};
 
 impl<R: Read> Decode<R> for [u8; 4] {
     type Future = ReadBytes<R, Self>;

@@ -1,4 +1,4 @@
-use {Result, Message};
+use {Message, Result};
 
 macro_rules! impl_anonymous_message {
     ($($param:ident),*) => {

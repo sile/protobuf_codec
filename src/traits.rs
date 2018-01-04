@@ -2,8 +2,8 @@ use std;
 use std::io::{Read, Write};
 use futures::Future;
 
-use {Result, Error};
-use future::decode::{DecodeInto, DecodeTryInto, DecodeMessage};
+use {Error, Result};
+use future::decode::{DecodeInto, DecodeMessage, DecodeTryInto};
 use future::encode::EncodeMessage;
 use wire::WireType;
 

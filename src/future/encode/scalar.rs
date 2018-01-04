@@ -2,10 +2,10 @@ use std::io::Write;
 use byteorder::{ByteOrder, LittleEndian};
 
 use Encode;
-use future::encode::{EncodeVarint, EncodeLengthDelimited};
+use future::encode::{EncodeLengthDelimited, EncodeVarint};
 use future::write::WriteBytes;
 use types;
-use wire::types::{Varint, LengthDelimited};
+use wire::types::{LengthDelimited, Varint};
 
 impl<W: Write> Encode<W> for types::Bool {
     type Future = EncodeVarint<W>;

@@ -1,8 +1,8 @@
 use std::io::Read;
 use std::marker::PhantomData;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
-use {Error, Decode};
+use {Decode, Error};
 use traits::TryFrom;
 
 #[derive(Debug)]

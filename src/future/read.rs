@@ -1,6 +1,6 @@
 use std::io::{self, Read};
 use std::mem;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
 use {Error, ErrorKind};
 
@@ -10,7 +10,9 @@ pub struct ReadByte<R> {
 }
 impl<R> ReadByte<R> {
     pub fn new(reader: R) -> Self {
-        ReadByte { reader: Some(reader) }
+        ReadByte {
+            reader: Some(reader),
+        }
     }
 }
 impl<R: Read> Future for ReadByte<R> {

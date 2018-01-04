@@ -1,12 +1,12 @@
 use std::io::Write;
 use std::mem;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
-use {Encode, Message, Error};
+use {Encode, Error, Message};
 use future::util;
 use traits::Field;
 use types::Embedded;
-use wire::types::{Varint, LengthDelimited};
+use wire::types::{LengthDelimited, Varint};
 use super::EncodeLengthDelimited;
 
 pub struct EncodeMessage<W, T>

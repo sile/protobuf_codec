@@ -48,7 +48,7 @@ pub type Result<T> = std::result::Result<T, trackable::error::TrackableError<Err
 mod test {
     use futures::Future;
 
-    use {Result, Message};
+    use {Message, Result};
     use fields::Field;
     use tags::{Tag1, Tag2};
     use types::Int32;

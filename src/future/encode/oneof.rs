@@ -1,5 +1,5 @@
 use std::io::Write;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
 use {Encode, Error};
 use fields;
@@ -37,7 +37,7 @@ macro_rules! define_and_impl_encode_oneof {
         impl<W, $($param),*> Encode<W> for fields::$oneof<$($param),*>
         where
             W: Write,
-            $($param: Encode<W> + SingularField),*        
+            $($param: Encode<W> + SingularField),*
         {
             type Future = $encoder<W, $($param),*>;
             fn encode(self, writer: W) -> Self::Future {

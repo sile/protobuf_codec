@@ -2,10 +2,10 @@ use std;
 use byteorder::{ByteOrder, LittleEndian};
 use trackable::error::ErrorKindExt;
 
-use {Result, ErrorKind};
-use traits::{FieldType, TryFrom, Message, Packable, MapKey};
+use {ErrorKind, Result};
+use traits::{FieldType, MapKey, Message, Packable, TryFrom};
 use wire::WireType;
-use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
+use wire::types::{Bit32, Bit64, LengthDelimited, Varint};
 
 macro_rules! impl_scalar_type {
     ($t:ident, $base:ty, $wire:ident) => {
@@ -221,9 +221,9 @@ pub struct Str(pub String);
 impl_scalar_type!(Str, String, LengthDelimited);
 impl TryFrom<Bytes> for Str {
     fn try_from(f: Bytes) -> Result<Str> {
-        String::from_utf8(f.0).map(Str).map_err(|e| {
-            ErrorKind::Invalid.cause(e)
-        })
+        String::from_utf8(f.0)
+            .map(Str)
+            .map_err(|e| ErrorKind::Invalid.cause(e))
     }
 }
 impl MapKey for Str {}

@@ -1,15 +1,15 @@
 use std::io::{Read, Take};
 use std::marker::PhantomData;
 use std::mem;
-use futures::{self, Future, Poll, Async};
+use futures::{self, Async, Future, Poll};
 use futures::future::Either;
 
-use {Error, Decode};
+use {Decode, Error};
 use future::decode::{DecodeInto, DecodeLengthDelimited};
 use future::util::Finished;
 use fields;
 use tags;
-use traits::{Tag, FieldType, Packable, DecodeField, Map};
+use traits::{DecodeField, FieldType, Map, Packable, Tag};
 use wire::WireType;
 use wire::types::LengthDelimited;
 
@@ -268,8 +268,10 @@ where
 {
     future: DecodeLengthDelimited<
         R,
-        (fields::Field<tags::Tag1, M::Key>,
-         fields::Field<tags::Tag2, M::Value>),
+        (
+            fields::Field<tags::Tag1, M::Key>,
+            fields::Field<tags::Tag2, M::Value>,
+        ),
     >,
 }
 impl<R, M> Future for DecodeMapEntry<R, M>
@@ -282,8 +284,6 @@ where
     type Item = (R, M::Key, M::Value);
     type Error = Error<R>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(track!(self.future.poll())?.map(|(r, v)| {
-            (r, (v.0).0.value, (v.0).1.value)
-        }))
+        Ok(track!(self.future.poll())?.map(|(r, v)| (r, (v.0).0.value, (v.0).1.value)))
     }
 }

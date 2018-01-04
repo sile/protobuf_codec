@@ -1,11 +1,11 @@
 use std::io::{self, Read, Take};
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
-use {Error, ErrorKind, Decode};
+use {Decode, Error, ErrorKind};
 use future::read::{ReadByte, ReadBytes};
-use future::util::{UnwrapTake, Phase2, Phase4};
+use future::util::{Phase2, Phase4, UnwrapTake};
 use wire::WireType;
-use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
+use wire::types::{Bit32, Bit64, LengthDelimited, Varint};
 use super::convert::DecodeInto;
 
 impl<R: Read> Decode<R> for Bit32 {
@@ -169,7 +169,9 @@ struct Null;
 impl<R: Read> Decode<R> for Null {
     type Future = DiscardAllBytes<R>;
     fn decode(reader: R) -> Self::Future {
-        DiscardAllBytes { reader: Some(reader) }
+        DiscardAllBytes {
+            reader: Some(reader),
+        }
     }
 }
 
@@ -181,9 +183,9 @@ impl<R: Read> Future for DiscardAllBytes<R> {
     type Item = (R, Null);
     type Error = Error<R>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let mut reader = self.reader.take().expect(
-            "Cannot poll DiscardAllBytes twice",
-        );
+        let mut reader = self.reader
+            .take()
+            .expect("Cannot poll DiscardAllBytes twice");
         let mut buf = [0; 1024];
         loop {
             match reader.read(&mut buf) {

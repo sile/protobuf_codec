@@ -1,10 +1,10 @@
 use std::io::Write;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
 use {Encode, Error};
 use future::util::{Phase2, WithState};
 use future::write::{WriteByte, WriteBytes};
-use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
+use wire::types::{Bit32, Bit64, LengthDelimited, Varint};
 
 impl<W: Write> Encode<W> for Bit32 {
     type Future = WriteBytes<W, [u8; 4]>;

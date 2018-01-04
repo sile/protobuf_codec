@@ -3,7 +3,7 @@ use std::io::Read;
 use Decode;
 use future::decode::{DecodeInto, DecodeTryInto};
 use types;
-use wire::types::{Varint, Bit32, Bit64, LengthDelimited};
+use wire::types::{Bit32, Bit64, LengthDelimited, Varint};
 
 impl<R: Read> Decode<R> for types::Bool {
     type Future = DecodeTryInto<R, Varint, Self>;

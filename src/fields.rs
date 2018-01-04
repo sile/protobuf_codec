@@ -1,4 +1,4 @@
-use traits::{self, Tag, FieldType, SingularField, Map};
+use traits::{self, FieldType, Map, SingularField, Tag};
 use variants;
 
 #[derive(Debug, Default)]

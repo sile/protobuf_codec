@@ -1,9 +1,9 @@
 use std::io::{Read, Take};
 use std::mem;
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
-use {Decode, Message, Error, ErrorKind};
-use future::decode::{DecodeMaybeVarint, DiscardWireValue, DecodeLengthDelimited};
+use {Decode, Error, ErrorKind, Message};
+use future::decode::{DecodeLengthDelimited, DecodeMaybeVarint, DiscardWireValue};
 use future::util::{self, Phase3};
 use traits::DecodeField;
 use types::Embedded;

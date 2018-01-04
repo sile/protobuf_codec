@@ -4,7 +4,7 @@ extern crate pbcodec;
 extern crate trackable;
 
 use futures::Future;
-use pbcodec::{Encode, Decode};
+use pbcodec::{Decode, Encode};
 use pbcodec::fields::PackedRepeatedField;
 use pbcodec::tags::Tag1;
 use pbcodec::types::Int32;

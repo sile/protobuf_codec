@@ -39,11 +39,9 @@ where
     type Item = (Take<R>, V);
     type Error = Error<R>;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.0.poll().map_err(|e| {
-            Error {
-                stream: e.stream.into_inner(),
-                error: e.error,
-            }
+        self.0.poll().map_err(|e| Error {
+            stream: e.stream.into_inner(),
+            error: e.error,
         })
     }
 }

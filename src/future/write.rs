@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
 use {Error, ErrorKind};
 
