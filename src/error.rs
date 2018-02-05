@@ -32,20 +32,6 @@ impl<T: std::fmt::Debug> std::error::Error for Error<T> {
 }
 impl<T> trackable::Trackable for Error<T> {
     type Event = trackable::error::Event;
-    fn enable_tracking(mut self) -> Self
-    where
-        Self: Sized,
-    {
-        self.error = self.error.enable_tracking();
-        self
-    }
-    fn disable_tracking(mut self) -> Self
-    where
-        Self: Sized,
-    {
-        self.error = self.error.disable_tracking();
-        self
-    }
     fn history(&self) -> Option<&trackable::History<Self::Event>> {
         self.error.history()
     }
