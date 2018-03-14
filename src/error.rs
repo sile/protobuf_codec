@@ -31,11 +31,11 @@ impl<T: std::fmt::Debug> std::error::Error for Error<T> {
     }
 }
 impl<T> trackable::Trackable for Error<T> {
-    type Event = trackable::error::Event;
-    fn history(&self) -> Option<&trackable::History<Self::Event>> {
+    type Event = trackable::Location;
+    fn history(&self) -> Option<&trackable::error::History> {
         self.error.history()
     }
-    fn history_mut(&mut self) -> Option<&mut trackable::History<Self::Event>> {
+    fn history_mut(&mut self) -> Option<&mut trackable::error::History> {
         self.error.history_mut()
     }
 }
