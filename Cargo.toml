@@ -1,5 +1,5 @@
 [package]
-name = "pbcodec"
+name = "protobuf_codec"
 version = "0.0.8"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "An asynchronous encoder/decoder for Protocol Buffers"
