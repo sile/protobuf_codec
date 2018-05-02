@@ -4,5 +4,6 @@ extern crate byteorder;
 extern crate trackable;
 
 pub mod field;
+pub mod message;
 pub mod value;
 pub mod wire;
