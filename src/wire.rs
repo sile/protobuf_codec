@@ -1,5 +1,6 @@
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use bytecodec::bytes::BytesEncoder;
+use bytecodec::combinator::{Buffered, Length};
 use field::Tag;
 
 use value::Value;
@@ -10,6 +11,41 @@ pub enum WireType {
     Bit32 = 5,
     Bit64 = 1,
     LengthDelimited = 2,
+}
+
+#[derive(Debug, Default)]
+pub struct TagAndTypeDecoder(VarintDecoder);
+impl Decode for TagAndTypeDecoder {
+    type Item = (Tag, WireType);
+
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        let (size, item) = track!(self.0.decode(buf, eos))?;
+        if let Some(n) = item {
+            let tag = n >> 3;
+            track_assert!(tag <= 0xFFFF_FFFF, ErrorKind::InvalidInput; tag);
+
+            let wire_type = match n & 0b111 {
+                0 => WireType::Varint,
+                5 => WireType::Bit32,
+                1 => WireType::Bit64,
+                2 => WireType::LengthDelimited,
+                wire_type => {
+                    track_panic!(ErrorKind::InvalidInput, "Unknown wire type"; wire_type, tag)
+                }
+            };
+            Ok((size, Some((tag as u32, wire_type))))
+        } else {
+            Ok((size, None))
+        }
+    }
+
+    fn has_terminated(&self) -> bool {
+        self.0.has_terminated()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.0.requiring_bytes()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -37,6 +73,39 @@ impl Encode for TagAndTypeEncoder {
 impl ExactBytesEncode for TagAndTypeEncoder {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct VarintDecoder {
+    value: u64,
+    index: usize,
+}
+impl Decode for VarintDecoder {
+    type Item = u64;
+
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        for (i, b) in buf.iter().cloned().enumerate() {
+            track_assert_ne!(self.index, 10, ErrorKind::InvalidInput);
+            self.value |= u64::from(b & 0b0111_1111) << (7 * self.index);
+            if (b & 0b1000_0000) == 0 {
+                let n = self.value;
+                self.index = 0;
+                self.value = 0;
+                return Ok((i + 1, Some(n)));
+            }
+            self.index += 1;
+        }
+        track_assert!(!eos.is_reached(), ErrorKind::UnexpectedEos);
+        Ok((buf.len(), None))
+    }
+
+    fn has_terminated(&self) -> bool {
+        false
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        ByteCount::Unknown
     }
 }
 
@@ -100,6 +169,46 @@ impl AsRef<[u8]> for VarintBuf {
 }
 
 #[derive(Debug, Default)]
+pub struct LengthDelimitedDecoder<D> {
+    len: Buffered<VarintDecoder>,
+    inner: Length<D>,
+}
+impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
+    type Item = D::Item;
+
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        let mut offset = 0;
+        if !self.len.has_item() {
+            offset += track!(self.len.decode(buf, eos))?.0;
+            if let Some(&len) = self.len.get_item() {
+                track!(self.inner.set_expected_bytes(len))?;
+            } else {
+                return Ok((offset, None));
+            }
+        }
+
+        let (size, item) = track!(self.inner.decode(&buf[offset..], eos))?;
+        offset += size;
+        if let Some(item) = item {
+            let _ = self.len.take_item();
+            Ok((offset, Some(item)))
+        } else {
+            Ok((offset, None))
+        }
+    }
+
+    fn has_terminated(&self) -> bool {
+        self.inner.has_terminated()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.len
+            .requiring_bytes()
+            .add_for_decoding(self.inner.requiring_bytes())
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct LengthDelimitedEncoder<E> {
     len: VarintEncoder,
     inner: E,
@@ -145,7 +254,7 @@ impl<T> Value for LengthDelimited<T> {
 #[cfg(test)]
 mod test {
     use bytecodec::Encode;
-    use bytecodec::io::IoEncodeExt;
+    use bytecodec::io::{IoDecodeExt, IoEncodeExt};
 
     use super::*;
 
@@ -162,5 +271,15 @@ mod test {
         track_try_unwrap!(encoder.start_encoding(300));
         track_try_unwrap!(encoder.encode_all(&mut buf));
         assert_eq!(buf, [0b1010_1100, 0b0000_0010]);
+    }
+
+    #[test]
+    fn varint_decoder_works() {
+        let mut decoder = VarintDecoder::default();
+
+        let mut buf = &[0b0000_0001, 0b1010_1100, 0b0000_0010][..];
+        assert_eq!(track_try_unwrap!(decoder.decode_exact(&mut buf)), 1);
+        assert_eq!(track_try_unwrap!(decoder.decode_exact(&mut buf)), 300);
+        assert_eq!(buf, []);
     }
 }
