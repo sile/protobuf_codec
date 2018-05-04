@@ -243,9 +243,9 @@ impl<E: ExactBytesEncode> ExactBytesEncode for LengthDelimitedEncoder<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LengthDelimited<T>(pub T);
-impl<T> Value for LengthDelimited<T> {
+impl<T: Default> Value for LengthDelimited<T> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }

@@ -14,7 +14,13 @@ macro_rules! try_encode {
     }
 }
 
+pub use tag::Tag;
+pub use value::Value;
+
 pub mod field;
+pub mod field2;
 pub mod message;
-pub mod value;
 pub mod wire;
+
+mod tag;
+mod value;

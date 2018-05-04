@@ -8,7 +8,7 @@ use bytecodec::combinator::Collect;
 
 // use message::{Embedded, EmbeddedMessageEncoder, Message2, Message2Encoder};
 use value::Value;
-use wire::{LengthDelimited, LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeEncoder};
+use wire::{LengthDelimitedDecoder, TagAndTypeEncoder};
 
 pub type Tag = u32;
 

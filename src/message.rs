@@ -1,8 +1,8 @@
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Decode, Eos, Result};
 
 use field::FieldDecode;
 use value::Value;
-use wire::{LengthDelimited, LengthDelimitedEncoder, TagAndTypeDecoder, WireType};
+use wire::{TagAndTypeDecoder, WireType};
 
 // macro_rules! try_encode {
 //     ($encoder:expr, $offset:expr, $buf:expr, $eos:expr) => {
@@ -17,9 +17,9 @@ use wire::{LengthDelimited, LengthDelimitedEncoder, TagAndTypeDecoder, WireType}
 
 pub trait Message {}
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Embedded<M>(pub M);
-impl<M: Message> Value for Embedded<M> {
+impl<M: Message + Default> Value for Embedded<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
@@ -48,7 +48,7 @@ where
             } else {
                 let (size, item) = track!(self.tag_and_type.decode(&buf[offset..], eos))?;
                 offset += size;
-                if let Some((tag, wire_type)) = item {
+                if let Some((tag, _wire_type)) = item {
                     if self.fields.0.start_decoding_field(tag) {
                     } else if self.fields.1.start_decoding_field(tag) {
                     } else {
