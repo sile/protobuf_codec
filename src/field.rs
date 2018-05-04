@@ -22,9 +22,19 @@ pub trait Field: Default {
 }
 
 pub trait FieldDecode: Decode {
-    fn start_decoding_field(&mut self, tag: Tag) -> bool;
-    fn is_suspended(&self) -> bool;
+    fn start_decoding_field(&mut self, tag: Tag) -> bool; // TODO: Result<bool>
+    fn is_suspended(&self) -> bool; // TODO: remove
+
+    fn in_decoding_field(&self) -> bool {
+        panic!()
+    }
+
+    fn take_field(&mut self) -> Result<Self::Item> {
+        panic!()
+    }
 }
+
+// TODO: FieldsDecoder
 
 #[derive(Debug, Default)]
 pub struct FieldDecoder<F, V> {
@@ -62,6 +72,7 @@ where
     }
 
     fn is_suspended(&self) -> bool {
+        // TODO:
         false
     }
 }
@@ -156,6 +167,7 @@ where
     }
 
     fn is_suspended(&self) -> bool {
+        // TODO:
         false
     }
 }
