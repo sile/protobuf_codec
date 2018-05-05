@@ -18,9 +18,9 @@ pub use tag::Tag;
 pub use value::Value;
 
 pub mod field;
-pub mod field2;
 pub mod message;
 pub mod wire;
 
+mod fields;
 mod tag;
 mod value;

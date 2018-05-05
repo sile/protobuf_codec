@@ -1,57 +1,50 @@
 use std::iter;
-use std::marker::PhantomData;
 use std::mem;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
-use bytecodec::combinator::Collect;
-// use bytecodec::bytes::BytesEncoder;
-// use bytecodec::io::IoEncodeExt;
+use bytecodec::{ByteCount, Decode, DecodeExt, Eos, ErrorKind, Result};
+use bytecodec::combinator::{Buffered, Collect};
 
-// use message::{Embedded, EmbeddedMessageEncoder, Message2, Message2Encoder};
-use value::Value;
-use wire::{LengthDelimitedDecoder, TagAndTypeEncoder};
+pub use fields::FieldsDecoder;
 
-pub type Tag = u32;
-
-pub trait Field: Default {
-    type Value: Value;
-    fn tag(&self) -> Tag;
-    // TODO: wire_type (?)
-    fn from_value(value: Self::Value) -> Self;
-    fn into_value(self) -> Self::Value;
-    fn value_mut(&mut self) -> &mut Self::Value;
-}
+use {Tag, Value};
+use wire::LengthDelimitedDecoder;
 
 pub trait FieldDecode: Decode {
-    fn start_decoding_field(&mut self, tag: Tag) -> bool; // TODO: Result<bool>
-    fn is_suspended(&self) -> bool; // TODO: remove
-
-    fn in_decoding_field(&self) -> bool {
-        panic!()
-    }
-
-    fn take_field(&mut self) -> Result<Self::Item> {
-        panic!()
-    }
+    fn start_decoding_field(&mut self, tag: Tag) -> Result<bool>;
+    fn is_field_being_decoded(&self) -> bool;
+    fn complete_field_decoding(&mut self) -> Result<Self::Item>;
 }
-
-// TODO: FieldsDecoder
 
 #[derive(Debug, Default)]
-pub struct FieldDecoder<F, V> {
-    field: F,
-    value: V,
+pub struct FieldDecoder<T, D: Decode> {
+    tag: T,
+    value: Buffered<D>,
+    is_running: bool,
 }
-impl<F, V> Decode for FieldDecoder<F, V>
+impl<T, D: Decode> FieldDecoder<T, D> {
+    pub fn new(tag: T, value: D) -> Self {
+        FieldDecoder {
+            tag,
+            value: value.buffered(),
+            is_running: false,
+        }
+    }
+}
+impl<T, D> Decode for FieldDecoder<T, D>
 where
-    F: Field,
-    V: Decode<Item = F::Value>,
+    T: AsRef<Tag>,
+    D: Decode,
+    D::Item: Value,
 {
-    type Item = F;
+    type Item = D::Item;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-        let (size, item) = track!(self.value.decode(buf, eos))?;
-        let item = item.map(F::from_value);
-        Ok((size, item))
+        track_assert!(self.is_running, ErrorKind::Other);
+
+        let size = track!(self.value.decode(buf, eos), "tag={}", self.tag.as_ref().0)?.0;
+        if self.value.has_item() {
+            self.is_running = false;
+        }
+        Ok((size, None))
     }
 
     fn has_terminated(&self) -> bool {
@@ -62,351 +55,167 @@ where
         self.value.requiring_bytes()
     }
 }
-impl<F, V> FieldDecode for FieldDecoder<F, V>
+impl<T, D> FieldDecode for FieldDecoder<T, D>
 where
-    F: Field,
-    V: Decode<Item = F::Value>,
-{
-    fn start_decoding_field(&mut self, tag: Tag) -> bool {
-        self.field.tag() == tag
-    }
-
-    fn is_suspended(&self) -> bool {
-        // TODO:
-        false
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct RepeatedFieldDecoder<F, D> {
-    field: F,
-    value_decoder: D,
-    is_suspended: bool,
-}
-impl<F, D> Decode for RepeatedFieldDecoder<F, D>
-where
-    F: Field,
+    T: AsRef<Tag>,
     D: Decode,
-    F::Value: Extend<D::Item>,
+    D::Item: Value,
 {
-    type Item = F;
-
-    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-        let (size, item) = track!(self.value_decoder.decode(buf, eos))?;
-        if let Some(v) = item {
-            self.is_suspended = true;
-            self.field.value_mut().extend(iter::once(v));
-        }
-        if eos.is_reached() {
-            let field = mem::replace(&mut self.field, F::default());
-            Ok((size, Some(field)))
+    fn start_decoding_field(&mut self, tag: Tag) -> Result<bool> {
+        if self.tag.as_ref() != &tag {
+            Ok(false)
         } else {
-            Ok((size, None))
+            track_assert!(!self.is_running, ErrorKind::Other);
+            track_assert!(
+                self.value.has_item(),
+                ErrorKind::InvalidInput,
+                "This field can be appeared at most once: tag={}",
+                self.tag.as_ref().0
+            );
+            self.is_running = true;
+            Ok(true)
         }
     }
 
-    fn has_terminated(&self) -> bool {
-        self.value_decoder.has_terminated()
+    fn is_field_being_decoded(&self) -> bool {
+        self.is_running
     }
 
-    fn requiring_bytes(&self) -> ByteCount {
-        self.value_decoder.requiring_bytes()
-    }
-}
-impl<F, D> FieldDecode for RepeatedFieldDecoder<F, D>
-where
-    F: Field,
-    D: Decode,
-    F::Value: Extend<D::Item>,
-{
-    fn start_decoding_field(&mut self, tag: Tag) -> bool {
-        self.is_suspended = false;
-        self.field.tag() == tag
-    }
-
-    fn is_suspended(&self) -> bool {
-        self.is_suspended
+    fn complete_field_decoding(&mut self) -> Result<Self::Item> {
+        track_assert!(!self.is_running, ErrorKind::InvalidInput);
+        let value = self.value.take_item().unwrap_or_else(Default::default);
+        Ok(value)
     }
 }
 
 #[derive(Debug, Default)]
-pub struct PackedRepeatedFieldDecoder<F: Field, D> {
-    field: F,
-    value_decoder: LengthDelimitedDecoder<Collect<D, F::Value>>,
+pub struct RepeatedFieldDecoder<T, V, D> {
+    tag: T,
+    value: D,
+    values: V,
+    is_running: bool,
 }
-impl<F, D> Decode for PackedRepeatedFieldDecoder<F, D>
+impl<T, V, D> Decode for RepeatedFieldDecoder<T, V, D>
 where
-    F: Field,
+    T: AsRef<Tag>,
+    V: Value + Extend<D::Item>,
     D: Decode,
-    F::Value: Extend<D::Item> + Default,
 {
-    type Item = F;
+    type Item = V;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-        let (size, item) = track!(self.value_decoder.decode(buf, eos))?;
-        let item = item.map(F::from_value);
-        Ok((size, item))
+        track_assert!(self.is_running, ErrorKind::Other);
+
+        let (size, item) = track!(self.value.decode(buf, eos), "tag={}", self.tag.as_ref().0)?;
+        if let Some(value) = item {
+            self.values.extend(iter::once(value));
+            self.is_running = false;
+        }
+        Ok((size, None))
     }
 
     fn has_terminated(&self) -> bool {
-        self.value_decoder.has_terminated()
+        self.value.has_terminated()
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        self.value_decoder.requiring_bytes()
+        self.value.requiring_bytes()
     }
 }
-impl<F, D> FieldDecode for PackedRepeatedFieldDecoder<F, D>
+impl<T, V, D> FieldDecode for RepeatedFieldDecoder<T, V, D>
 where
-    F: Field,
+    T: AsRef<Tag>,
+    V: Value + Extend<D::Item>,
     D: Decode,
-    F::Value: Extend<D::Item> + Default,
 {
-    fn start_decoding_field(&mut self, tag: Tag) -> bool {
-        self.field.tag() == tag
-    }
-
-    fn is_suspended(&self) -> bool {
-        // TODO:
-        false
-    }
-}
-
-#[derive(Debug)]
-pub struct FieldEncoder<F, V> {
-    tag_and_type: TagAndTypeEncoder,
-    value: V,
-    _field: PhantomData<F>,
-}
-impl<F, V> Encode for FieldEncoder<F, V>
-where
-    F: Field,
-    V: Encode<Item = F::Value>,
-{
-    type Item = F;
-
-    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-        let mut offset = 0;
-        try_encode!(self.tag_and_type, offset, buf, eos);
-        offset += track!(self.value.encode(&mut buf[offset..], eos))?;
-        Ok(offset)
-    }
-
-    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let tag = item.tag();
-        let value = item.into_value();
-        let t = (tag, value.wire_type());
-        track!(self.tag_and_type.start_encoding(t))?;
-        track!(self.value.start_encoding(value))?;
-        Ok(())
-    }
-
-    fn is_idle(&self) -> bool {
-        self.tag_and_type.is_idle() && self.value.is_idle()
-    }
-
-    fn requiring_bytes(&self) -> ByteCount {
-        self.tag_and_type
-            .requiring_bytes()
-            .add_for_encoding(self.value.requiring_bytes())
-    }
-}
-impl<F, V> ExactBytesEncode for FieldEncoder<F, V>
-where
-    F: Field,
-    V: ExactBytesEncode<Item = F::Value>,
-{
-    fn exact_requiring_bytes(&self) -> u64 {
-        self.tag_and_type.exact_requiring_bytes() + self.value.exact_requiring_bytes()
-    }
-}
-impl<F, V: Default> Default for FieldEncoder<F, V> {
-    fn default() -> Self {
-        FieldEncoder {
-            tag_and_type: Default::default(),
-            value: Default::default(),
-            _field: PhantomData,
+    fn start_decoding_field(&mut self, tag: Tag) -> Result<bool> {
+        if self.tag.as_ref() != &tag {
+            Ok(false)
+        } else {
+            track_assert!(!self.is_running, ErrorKind::Other);
+            self.is_running = true;
+            Ok(true)
         }
     }
+
+    fn is_field_being_decoded(&self) -> bool {
+        self.is_running
+    }
+
+    fn complete_field_decoding(&mut self) -> Result<Self::Item> {
+        track_assert!(!self.is_running, ErrorKind::InvalidInput);
+        let values = mem::replace(&mut self.values, V::default());
+        Ok(values)
+    }
 }
 
-// #[derive(Debug)]
-// pub struct RepeatedFieldEncoder<I, V> {
-//     bytes: BytesEncoder<Vec<u8>>,
-//     field: FieldEncoder<V>,
-//     _iter: PhantomData<I>,
-// }
-// impl<I, V> Encode for RepeatedFieldEncoder<I, V>
-// where
-//     I: Iterator<Item = V::Item>,
-//     V: Encode,
-//     V::Item: Value,
-// {
-//     type Item = Field<I>;
+#[derive(Debug, Default)]
+pub struct PackedRepeatedFieldDecoder<T, V, D>
+where
+    V: Value + Extend<D::Item>,
+    D: Decode,
+{
+    tag: T,
+    value: Buffered<LengthDelimitedDecoder<Collect<D, V>>>,
+    is_running: bool,
+}
+impl<T, V, D> Decode for PackedRepeatedFieldDecoder<T, V, D>
+where
+    T: AsRef<Tag>,
+    V: Value + Extend<D::Item>,
+    D: Decode,
+{
+    type Item = V;
 
-//     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-//         track!(self.bytes.encode(buf, eos))
-//     }
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        track_assert!(self.is_running, ErrorKind::Other);
 
-//     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-//         let tag = item.tag;
-//         let mut buf = Vec::new();
-//         for value in item.value {
-//             track!(self.field.start_encoding(Field { tag, value }))?;
-//             track!(self.field.encode_all(&mut buf))?;
-//         }
-//         track!(self.bytes.start_encoding(buf))
-//     }
+        let size = track!(self.value.decode(buf, eos), "tag={}", self.tag.as_ref().0)?.0;
+        if self.value.has_item() {
+            self.is_running = false;
+        }
+        Ok((size, None))
+    }
 
-//     fn is_idle(&self) -> bool {
-//         self.bytes.is_idle()
-//     }
+    fn has_terminated(&self) -> bool {
+        self.value.has_terminated()
+    }
 
-//     fn requiring_bytes(&self) -> ByteCount {
-//         self.bytes.requiring_bytes()
-//     }
-// }
-// impl<I, V> ExactBytesEncode for RepeatedFieldEncoder<I, V>
-// where
-//     I: Iterator<Item = V::Item>,
-//     V: Encode,
-//     V::Item: Value,
-// {
-//     fn exact_requiring_bytes(&self) -> u64 {
-//         self.bytes.exact_requiring_bytes()
-//     }
-// }
-// impl<I, V: Default> Default for RepeatedFieldEncoder<I, V> {
-//     fn default() -> Self {
-//         RepeatedFieldEncoder {
-//             bytes: BytesEncoder::default(),
-//             field: FieldEncoder::default(),
-//             _iter: PhantomData,
-//         }
-//     }
-// }
+    fn requiring_bytes(&self) -> ByteCount {
+        self.value.requiring_bytes()
+    }
+}
+impl<T, V, D> FieldDecode for PackedRepeatedFieldDecoder<T, V, D>
+where
+    T: AsRef<Tag>,
+    V: Value + Extend<D::Item>,
+    D: Decode,
+{
+    fn start_decoding_field(&mut self, tag: Tag) -> Result<bool> {
+        if self.tag.as_ref() != &tag {
+            Ok(false)
+        } else {
+            track_assert!(!self.is_running, ErrorKind::Other);
+            track_assert!(
+                self.value.has_item(),
+                ErrorKind::InvalidInput,
+                "This field can be appeared at most once: tag={}",
+                self.tag.as_ref().0
+            );
+            self.is_running = true;
+            Ok(true)
+        }
+    }
 
-// #[derive(Debug)]
-// pub struct PackedRepeatedFieldEncoder<I, V> {
-//     inner: FieldEncoder<LengthDelimitedEncoder<BytesEncoder<Vec<u8>>>>,
-//     value: V,
-//     _iter: PhantomData<I>,
-// }
-// impl<I, V> Encode for PackedRepeatedFieldEncoder<I, V>
-// where
-//     I: Iterator<Item = V::Item>,
-//     V: Encode,
-// {
-//     type Item = Field<I>;
+    fn is_field_being_decoded(&self) -> bool {
+        self.is_running
+    }
 
-//     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-//         track!(self.inner.encode(buf, eos))
-//     }
+    fn complete_field_decoding(&mut self) -> Result<Self::Item> {
+        track_assert!(!self.is_running, ErrorKind::InvalidInput);
+        let values = self.value.take_item().unwrap_or_else(Default::default);
+        Ok(values)
+    }
+}
 
-//     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-//         let tag = item.tag;
-//         let mut buf = Vec::new();
-//         for value in item.value {
-//             track!(self.value.start_encoding(value))?;
-//             track!(self.value.encode_all(&mut buf))?;
-//         }
-
-//         let value = LengthDelimited(buf);
-//         track!(self.inner.start_encoding(Field { tag, value }))
-//     }
-
-//     fn is_idle(&self) -> bool {
-//         self.inner.is_idle()
-//     }
-
-//     fn requiring_bytes(&self) -> ByteCount {
-//         self.inner.requiring_bytes()
-//     }
-// }
-// impl<I, V> ExactBytesEncode for PackedRepeatedFieldEncoder<I, V>
-// where
-//     I: Iterator<Item = V::Item>,
-//     V: Encode,
-// {
-//     fn exact_requiring_bytes(&self) -> u64 {
-//         self.inner.exact_requiring_bytes()
-//     }
-// }
-// impl<I, V: Default> Default for PackedRepeatedFieldEncoder<I, V> {
-//     fn default() -> Self {
-//         PackedRepeatedFieldEncoder {
-//             inner: FieldEncoder::default(),
-//             value: V::default(),
-//             _iter: PhantomData,
-//         }
-//     }
-// }
-
-// #[derive(Debug)]
-// pub struct MapFieldEncoder<I, K, V> {
-//     bytes: BytesEncoder<Vec<u8>>,
-//     field: FieldEncoder<EmbeddedMessageEncoder<Message2Encoder<K, V>>>,
-//     _iter: PhantomData<I>,
-// }
-// impl<I, K, V> Encode for MapFieldEncoder<I, K, V>
-// where
-//     I: Iterator<Item = (K::Item, V::Item)>,
-//     K: ExactBytesEncode,
-//     V: ExactBytesEncode,
-//     K::Item: Value,
-//     V::Item: Value,
-// {
-//     type Item = Field<I>;
-
-//     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-//         track!(self.bytes.encode(buf, eos))
-//     }
-
-//     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-//         let tag = item.tag;
-//         let mut buf = Vec::new();
-//         for (k, v) in item.value {
-//             // TODO: let value = Embedded(Message2(Tag1(k), Tag2(v)));
-//             let value = Embedded(Message2(k, v));
-//             let field = Field { tag, value };
-//             track!(self.field.start_encoding(field))?;
-//             track!(self.field.encode_all(&mut buf))?;
-//         }
-//         track!(self.bytes.start_encoding(buf))
-//     }
-
-//     fn is_idle(&self) -> bool {
-//         self.bytes.is_idle()
-//     }
-
-//     fn requiring_bytes(&self) -> ByteCount {
-//         self.bytes.requiring_bytes()
-//     }
-// }
-// impl<I, K, V> ExactBytesEncode for MapFieldEncoder<I, K, V>
-// where
-//     I: Iterator<Item = (K::Item, V::Item)>,
-//     K: ExactBytesEncode,
-//     V: ExactBytesEncode,
-//     K::Item: Value,
-//     V::Item: Value,
-// {
-//     fn exact_requiring_bytes(&self) -> u64 {
-//         self.bytes.exact_requiring_bytes()
-//     }
-// }
-// impl<I, K: Default, V: Default> Default for MapFieldEncoder<I, K, V> {
-//     fn default() -> Self {
-//         MapFieldEncoder {
-//             bytes: Default::default(),
-//             field: Default::default(),
-//             _iter: PhantomData,
-//         }
-//     }
-// }
-
-// #[derive(Debug)]
-// pub enum OneOf2<A, B> {
-//     A(A),
-//     B(B),
-// }
+// TODO: map, oneof

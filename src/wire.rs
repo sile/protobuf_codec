@@ -1,8 +1,8 @@
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use bytecodec::bytes::BytesEncoder;
 use bytecodec::combinator::{Buffered, Length};
-use field::Tag;
 
+use tag::Tag;
 use value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -33,7 +33,7 @@ impl Decode for TagAndTypeDecoder {
                     track_panic!(ErrorKind::InvalidInput, "Unknown wire type"; wire_type, tag)
                 }
             };
-            Ok((size, Some((tag as u32, wire_type))))
+            Ok((size, Some((Tag(tag as u32), wire_type))))
         } else {
             Ok((size, None))
         }
@@ -58,7 +58,7 @@ impl Encode for TagAndTypeEncoder {
     }
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let n = (u64::from(item.0) << 3) | (item.0 as u64);
+        let n = (u64::from((item.0).0) << 3) | (item.1 as u64);
         track!(self.0.start_encoding(n))
     }
 
