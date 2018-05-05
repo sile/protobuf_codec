@@ -15,6 +15,6 @@ travis-ci = {repository = "sile/pbcodec"}
 codecov = {repository = "sile/pbcodec"}
 
 [dependencies]
-bytecodec = "0.2"
+bytecodec = "0.3"
 byteorder = "1"
 trackable = "0.2"
