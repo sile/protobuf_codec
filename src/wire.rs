@@ -202,7 +202,7 @@ pub struct LengthDelimitedEncoder<E> {
     inner: E,
 }
 impl<E: ExactBytesEncode> Encode for LengthDelimitedEncoder<E> {
-    type Item = LengthDelimited<E::Item>;
+    type Item = E::Item;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         let mut offset = track!(self.len.encode(buf, eos))?;
@@ -212,7 +212,7 @@ impl<E: ExactBytesEncode> Encode for LengthDelimitedEncoder<E> {
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
         track_assert!(self.is_idle(), ErrorKind::EncoderFull);
-        track!(self.inner.start_encoding(item.0))?;
+        track!(self.inner.start_encoding(item))?;
         track!(self.len.start_encoding(self.inner.exact_requiring_bytes()))?;
         Ok(())
     }
