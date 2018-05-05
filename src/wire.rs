@@ -39,10 +39,6 @@ impl Decode for TagAndTypeDecoder {
         }
     }
 
-    fn is_idle(&self) -> bool {
-        self.0.is_idle()
-    }
-
     fn requiring_bytes(&self) -> ByteCount {
         self.0.requiring_bytes()
     }
@@ -98,10 +94,6 @@ impl Decode for VarintDecoder {
         }
         track_assert!(!eos.is_reached(), ErrorKind::UnexpectedEos);
         Ok((buf.len(), None))
-    }
-
-    fn is_idle(&self) -> bool {
-        self.index == 0
     }
 
     fn requiring_bytes(&self) -> ByteCount {
@@ -195,10 +187,6 @@ impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
         } else {
             Ok((offset, None))
         }
-    }
-
-    fn is_idle(&self) -> bool {
-        self.len.is_idle()
     }
 
     fn requiring_bytes(&self) -> ByteCount {

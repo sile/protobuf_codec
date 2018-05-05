@@ -12,7 +12,7 @@ where
     F0: FieldDecode,
     F1: FieldDecode,
 {
-    type Item = (F0::Item, F1::Item);
+    type Item = (F0::Item, F1::Item); // TODO: (Option<F0::Item>, ...)
 
     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
         if track!(self.fields.0.start_decoding(tag))? {
