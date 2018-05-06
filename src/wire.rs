@@ -1,4 +1,7 @@
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+//! Encoders and decoders and related components for values used in the [binary wire format].
+//!
+//! [binary wire format]: https://developers.google.com/protocol-buffers/docs/encoding
+use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use bytecodec::bytes::BytesEncoder;
 use bytecodec::combinator::{Buffered, Length};
 
@@ -22,6 +25,11 @@ pub enum WireType {
 
 #[derive(Debug, Default)]
 pub struct TagAndTypeDecoder(VarintDecoder);
+impl TagAndTypeDecoder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 impl Decode for TagAndTypeDecoder {
     type Item = (Tag, WireType);
 
@@ -53,6 +61,11 @@ impl Decode for TagAndTypeDecoder {
 
 #[derive(Debug, Default)]
 pub struct TagAndTypeEncoder(VarintEncoder);
+impl TagAndTypeEncoder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 impl Encode for TagAndTypeEncoder {
     type Item = (Tag, WireType);
 
@@ -84,6 +97,11 @@ pub struct VarintDecoder {
     value: u64,
     index: usize,
 }
+impl VarintDecoder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 impl Decode for VarintDecoder {
     type Item = u64;
 
@@ -107,9 +125,19 @@ impl Decode for VarintDecoder {
         ByteCount::Unknown
     }
 }
+impl WireDecode for VarintDecoder {
+    fn wire_type(&self) -> WireType {
+        WireType::Varint
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct VarintEncoder(BytesEncoder<VarintBuf>);
+impl VarintEncoder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 impl Encode for VarintEncoder {
     type Item = u64;
 
@@ -147,6 +175,11 @@ impl ExactBytesEncode for VarintEncoder {
         self.0.exact_requiring_bytes()
     }
 }
+impl WireEncode for VarintEncoder {
+    fn wire_type(&self) -> WireType {
+        WireType::Varint
+    }
+}
 
 #[derive(Debug)]
 struct VarintBuf {
@@ -171,6 +204,26 @@ impl AsRef<[u8]> for VarintBuf {
 pub struct LengthDelimitedDecoder<D> {
     len: Buffered<VarintDecoder>,
     inner: Length<D>,
+}
+impl<D: Decode> LengthDelimitedDecoder<D> {
+    pub fn new(inner: D) -> Self {
+        LengthDelimitedDecoder {
+            len: Default::default(),
+            inner: inner.length(0),
+        }
+    }
+
+    pub fn inner_ref(&self) -> &D {
+        self.inner.inner_ref()
+    }
+
+    pub fn inner_mut(&mut self) -> &mut D {
+        self.inner.inner_mut()
+    }
+
+    pub fn into_inner(self) -> D {
+        self.inner.into_inner()
+    }
 }
 impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
     type Item = D::Item;
@@ -202,11 +255,36 @@ impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
             .add_for_decoding(self.inner.requiring_bytes())
     }
 }
+impl<D: Decode> WireDecode for LengthDelimitedDecoder<D> {
+    fn wire_type(&self) -> WireType {
+        WireType::LengthDelimited
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct LengthDelimitedEncoder<E> {
     len: VarintEncoder,
     inner: E,
+}
+impl<E: ExactBytesEncode> LengthDelimitedEncoder<E> {
+    pub fn new(inner: E) -> Self {
+        LengthDelimitedEncoder {
+            len: Default::default(),
+            inner,
+        }
+    }
+
+    pub fn inner_ref(&self) -> &E {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut E {
+        &mut self.inner
+    }
+
+    pub fn into_inner(self) -> E {
+        self.inner
+    }
 }
 impl<E: ExactBytesEncode> Encode for LengthDelimitedEncoder<E> {
     type Item = E::Item;
@@ -235,6 +313,11 @@ impl<E: ExactBytesEncode> Encode for LengthDelimitedEncoder<E> {
 impl<E: ExactBytesEncode> ExactBytesEncode for LengthDelimitedEncoder<E> {
     fn exact_requiring_bytes(&self) -> u64 {
         self.len.exact_requiring_bytes() + self.inner.exact_requiring_bytes()
+    }
+}
+impl<E: ExactBytesEncode> WireEncode for LengthDelimitedEncoder<E> {
+    fn wire_type(&self) -> WireType {
+        WireType::LengthDelimited
     }
 }
 

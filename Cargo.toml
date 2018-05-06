@@ -16,5 +16,4 @@ codecov = {repository = "sile/pbcodec"}
 
 [dependencies]
 bytecodec = "0.3"
-byteorder = "1"
 trackable = "0.2"

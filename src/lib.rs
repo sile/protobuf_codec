@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate bytecodec;
-extern crate byteorder;
 #[macro_use]
 extern crate trackable;
 
