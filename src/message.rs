@@ -1,106 +1,171 @@
-// use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
+use bytecodec::combinator::PreEncode;
 
-// use field::FieldDecode;
-// // use value::Value;
-// use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder};
+use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
+use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder, WireDecode,
+           WireEncode, WireType};
 
-// pub trait Message {}
+pub trait MessageDecode: Decode {}
 
-// // #[derive(Debug, Default)]
-// // pub struct Embedded<M>(pub M);
-// // impl<M: Message + Default> Value for Embedded<M> {
-// //     fn wire_type(&self) -> WireType {
-// //         WireType::LengthDelimited
-// //     }
-// // }
+pub trait MessageEncode: Encode {}
+impl<M: MessageEncode> MessageEncode for PreEncode<M> {}
 
-// // TODO: TopLevelMessageDecoder or Dispatcher
-// #[derive(Debug, Default)]
-// pub struct MessageDecoder<F> {
-//     tag_and_type: TagAndTypeDecoder,
-//     field: F,
-// }
-// impl<F: FieldDecode> Decode for MessageDecoder<F> {
-//     type Item = F::Item;
+#[derive(Debug, Default)]
+pub struct MessageDecoder<F> {
+    tag_and_type: TagAndTypeDecoder,
+    field: F,
+    unknown_field: UnknownFieldDecoder,
+}
+impl<F: FieldDecode> MessageDecoder<F> {
+    pub fn new(field_decoder: F) -> Self {
+        MessageDecoder {
+            tag_and_type: TagAndTypeDecoder::default(),
+            field: field_decoder,
+            unknown_field: UnknownFieldDecoder::default(),
+        }
+    }
+}
+impl<F: FieldDecode> Decode for MessageDecoder<F> {
+    type Item = F::Item;
 
-//     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-//         let mut offset = 0;
-//         while offset < buf.len() {
-//             if self.field.is_decoding() {
-//                 let size = track!(self.field.field_decode(&buf[offset..], eos))?;
-//                 offset += size;
-//                 if self.field.is_decoding() {
-//                     return Ok((offset, None));
-//                 }
-//             } else {
-//                 let (size, item) = track!(self.tag_and_type.decode(&buf[offset..], eos))?;
-//                 offset += size;
-//                 if let Some((tag, _wire_type)) = item {
-//                     if !track!(self.field.start_decoding(tag))? {
-//                         // TODO: ignore the field
-//                     }
-//                 }
-//             }
-//         }
-//         if eos.is_reached() {
-//             track!(self.tag_and_type.decode(&[][..], eos))?;
-//             let v = track!(self.field.finish_decoding())?;
-//             Ok((offset, Some(v)))
-//         } else {
-//             Ok((offset, None))
-//         }
-//     }
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        let mut offset = 0;
+        while offset < buf.len() {
+            if self.field.is_decoding() {
+                let size = track!(self.field.field_decode(&buf[offset..], eos))?;
+                offset += size;
+                if self.field.is_decoding() {
+                    return Ok((offset, None));
+                }
+            } else if self.unknown_field.is_decoding() {
+                let size = track!(self.unknown_field.field_decode(&buf[offset..], eos))?;
+                offset += size;
+                if self.unknown_field.is_decoding() {
+                    return Ok((offset, None));
+                }
+            } else {
+                let (size, item) = track!(self.tag_and_type.decode(&buf[offset..], eos))?;
+                offset += size;
+                if let Some((tag, wire_type)) = item {
+                    if !track!(self.field.start_decoding(tag, wire_type))? {
+                        track!(self.unknown_field.start_decoding(tag, wire_type))?;
+                    }
+                }
+            }
+        }
+        if eos.is_reached() {
+            let _ = track!(self.tag_and_type.decode(&[][..], eos))?; // Unexpected EOS check
+            let v = track!(self.field.finish_decoding())?;
+            let _ = track!(self.unknown_field.finish_decoding())?;
+            Ok((offset, Some(v)))
+        } else {
+            Ok((offset, None))
+        }
+    }
 
-//     fn requiring_bytes(&self) -> ByteCount {
-//         // TODO:
-//         ByteCount::Unknown
-//     }
-// }
+    fn requiring_bytes(&self) -> ByteCount {
+        self.tag_and_type
+            .requiring_bytes()
+            .add_for_decoding(self.field.requiring_bytes())
+            .add_for_decoding(self.unknown_field.requiring_bytes())
+    }
+}
+impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {}
 
-// #[derive(Debug, Default)]
-// pub struct EmbeddedMessageDecoder<F>(LengthDelimitedDecoder<MessageDecoder<F>>);
-// impl<F: FieldDecode> Decode for EmbeddedMessageDecoder<F> {
-//     type Item = F::Item;
+#[derive(Debug, Default)]
+pub struct EmbeddedMessageDecoder<M>(LengthDelimitedDecoder<M>);
+impl<M: MessageDecode> Decode for EmbeddedMessageDecoder<M> {
+    type Item = Option<M::Item>;
 
-//     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-//         track!(self.0.decode(buf, eos))
-//     }
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        let (size, item) = track!(self.0.decode(buf, eos))?;
+        Ok((size, item.map(Some)))
+    }
 
-//     fn requiring_bytes(&self) -> ByteCount {
-//         self.0.requiring_bytes()
-//     }
-// }
+    fn requiring_bytes(&self) -> ByteCount {
+        self.0.requiring_bytes()
+    }
+}
+impl<M: MessageDecode> WireDecode for EmbeddedMessageDecoder<M> {
+    fn wire_type(&self) -> WireType {
+        WireType::LengthDelimited
+    }
+}
 
-// #[derive(Debug, Default)]
-// pub struct EmbeddedMessageEncoder<E>(LengthDelimitedEncoder<E>);
-// impl<E> Encode for EmbeddedMessageEncoder<E>
-// where
-//     E: ExactBytesEncode,
-// {
-//     type Item = E::Item;
+#[derive(Debug, Default)]
+pub struct MessageEncoder<F> {
+    field: F,
+}
+impl<F: FieldEncode> MessageEncoder<F> {
+    pub fn new(field_encoder: F) -> Self {
+        MessageEncoder {
+            field: field_encoder,
+        }
+    }
+}
+impl<F: FieldEncode> Encode for MessageEncoder<F> {
+    type Item = F::Item;
 
-//     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-//         track!(self.0.encode(buf, eos))
-//     }
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        track!(self.field.encode(buf, eos))
+    }
 
-//     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-//         track!(self.0.start_encoding(item))
-//     }
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track!(self.field.start_encoding(item))
+    }
 
-//     fn is_idle(&self) -> bool {
-//         self.0.is_idle()
-//     }
+    fn is_idle(&self) -> bool {
+        self.field.is_idle()
+    }
 
-//     fn requiring_bytes(&self) -> ByteCount {
-//         self.0.requiring_bytes()
-//     }
-// }
-// impl<E> ExactBytesEncode for EmbeddedMessageEncoder<E>
-// where
-//     E: ExactBytesEncode,
-//     E::Item: Message,
-// {
-//     fn exact_requiring_bytes(&self) -> u64 {
-//         self.0.exact_requiring_bytes()
-//     }
-// }
+    fn requiring_bytes(&self) -> ByteCount {
+        self.field.requiring_bytes()
+    }
+}
+impl<F: FieldEncode + ExactBytesEncode> ExactBytesEncode for MessageEncoder<F> {
+    fn exact_requiring_bytes(&self) -> u64 {
+        self.field.exact_requiring_bytes()
+    }
+}
+impl<F: FieldEncode> MessageEncode for MessageEncoder<F> {}
+
+#[derive(Debug, Default)]
+pub struct EmbeddedMessageEncoder<M> {
+    message: LengthDelimitedEncoder<M>,
+}
+impl<M: MessageEncode + ExactBytesEncode> EmbeddedMessageEncoder<M> {
+    pub fn new(message_encoder: M) -> Self {
+        EmbeddedMessageEncoder {
+            message: LengthDelimitedEncoder::new(message_encoder),
+        }
+    }
+}
+impl<M: MessageEncode + ExactBytesEncode> Encode for EmbeddedMessageEncoder<M> {
+    type Item = M::Item;
+
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        track!(self.message.encode(buf, eos))
+    }
+
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track!(self.message.start_encoding(item))
+    }
+
+    fn is_idle(&self) -> bool {
+        self.message.is_idle()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.message.requiring_bytes()
+    }
+}
+impl<M: MessageEncode + ExactBytesEncode> ExactBytesEncode for EmbeddedMessageEncoder<M> {
+    fn exact_requiring_bytes(&self) -> u64 {
+        self.message.exact_requiring_bytes()
+    }
+}
+impl<M: MessageEncode + ExactBytesEncode> WireEncode for EmbeddedMessageEncoder<M> {
+    fn wire_type(&self) -> WireType {
+        WireType::LengthDelimited
+    }
+}

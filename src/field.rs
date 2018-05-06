@@ -1,23 +1,113 @@
 // use std::iter;
 // use std::mem;
-// use bytecodec::{Decode, DecodeExt, Eos, ErrorKind, Result};
-use bytecodec::{Eos, Result};
+// use message::EmbeddedMessageDecoder;
+// use tag::{Tag1, Tag2};
+// use wire::LengthDelimitedDecoder;
+use bytecodec::{ByteCount, Encode, Eos, ExactBytesEncode, Result};
 // use bytecodec::combinator::{Buffered, Collect};
 
 pub use fields::FieldsDecoder;
 
+use message::EmbeddedMessageEncoder;
 use tag::Tag;
-// use message::EmbeddedMessageDecoder;
-// use tag::{Tag1, Tag2};
-// use wire::LengthDelimitedDecoder;
+use wire::{TagAndTypeEncoder, WireEncode, WireType};
 
 pub trait FieldDecode {
     type Item;
 
-    fn start_decoding(&mut self, tag: Tag) -> Result<bool>; // TODO: add wire_type
+    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool>;
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize>;
     fn is_decoding(&self) -> bool;
     fn finish_decoding(&mut self) -> Result<Self::Item>;
+    fn requiring_bytes(&self) -> ByteCount;
+}
+
+pub trait FieldEncode: Encode {}
+
+#[derive(Debug, Default)]
+pub struct UnknownFieldDecoder {}
+impl FieldDecode for UnknownFieldDecoder {
+    type Item = ();
+
+    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
+        panic!()
+    }
+    fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        panic!()
+    }
+    fn is_decoding(&self) -> bool {
+        panic!()
+    }
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        panic!()
+    }
+    fn requiring_bytes(&self) -> ByteCount {
+        panic!()
+    }
+}
+
+pub type MessageFieldEncoder<T, M> = FieldEncoder<T, EmbeddedMessageEncoder<M>>;
+
+#[derive(Debug, Default)]
+pub struct FieldEncoder<T, E> {
+    tag: T,
+    tag_and_type: TagAndTypeEncoder,
+    value: E,
+}
+impl<T, E> FieldEncoder<T, E> {
+    pub fn new(tag: T, value_encoder: E) -> Self {
+        FieldEncoder {
+            tag,
+            tag_and_type: TagAndTypeEncoder::new(),
+            value: value_encoder,
+        }
+    }
+}
+impl<T, E> Encode for FieldEncoder<T, E>
+where
+    T: Copy + Into<Tag>,
+    E: WireEncode,
+{
+    type Item = E::Item;
+
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        let mut offset = 0;
+        bytecodec_try_encode!(self.tag_and_type, offset, buf, eos);
+        bytecodec_try_encode!(self.value, offset, buf, eos);
+        Ok(offset)
+    }
+
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        let tag_and_type = (self.tag.into(), self.value.wire_type());
+        track!(self.tag_and_type.start_encoding(tag_and_type))?;
+        track!(self.value.start_encoding(item))?;
+        Ok(())
+    }
+
+    fn is_idle(&self) -> bool {
+        self.value.is_idle()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.tag_and_type
+            .requiring_bytes()
+            .add_for_encoding(self.value.requiring_bytes())
+    }
+}
+impl<T, E> ExactBytesEncode for FieldEncoder<T, E>
+where
+    T: Copy + Into<Tag>,
+    E: ExactBytesEncode + WireEncode,
+{
+    fn exact_requiring_bytes(&self) -> u64 {
+        self.tag_and_type.exact_requiring_bytes() + self.value.exact_requiring_bytes()
+    }
+}
+impl<T, E> FieldEncode for FieldEncoder<T, E>
+where
+    T: Copy + Into<Tag>,
+    E: WireEncode,
+{
 }
 
 // // singular: a well-formed message can have zero or one of this field (but not more than one).
@@ -296,4 +386,34 @@ pub trait FieldDecode {
 //     }
 // }
 
-// // UnknownFieldDecoder
+#[cfg(test)]
+mod test {
+    use bytecodec::EncodeExt;
+    use bytecodec::io::{IoDecodeExt, IoEncodeExt};
+
+    use scalar::Fixed32Encoder;
+    use tag::Tag1;
+    use super::*;
+
+    macro_rules! assert_decode {
+        ($decoder:ident, $value:expr, $bytes:expr) => {
+            let mut decoder = $decoder::new();
+            let item = track_try_unwrap!(decoder.decode_exact($bytes.as_ref()));
+            assert_eq!(item, $value);
+        }
+    }
+
+    macro_rules! assert_encode {
+        ($encoder:ty, $value:expr, $bytes:expr) => {
+            let mut buf = Vec::new();
+            let mut encoder: $encoder = track_try_unwrap!(EncodeExt::with_item($value));
+            track_try_unwrap!(encoder.encode_all(&mut buf));
+            assert_eq!(buf, $bytes);
+        }
+    }
+
+    #[test]
+    fn field_encoder_works() {
+        assert_encode!(FieldEncoder<Tag1, Fixed32Encoder>, 123, [0x0d, 0x7b, 0x00, 0x00, 0x00]);
+    }
+}

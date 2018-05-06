@@ -7,6 +7,7 @@ use bytecodec::combinator::{Buffered, Length};
 
 use tag::Tag;
 
+// WireValueEncode
 pub trait WireDecode: Decode {
     fn wire_type(&self) -> WireType;
 }

@@ -1,7 +1,8 @@
-use bytecodec::{Eos, ErrorKind, Result};
+use bytecodec::{ByteCount, Eos, ErrorKind, Result};
 
 use field::FieldDecode;
 use tag::Tag;
+use wire::WireType;
 
 #[derive(Debug, Default)]
 pub struct FieldsDecoder<F> {
@@ -14,10 +15,10 @@ where
 {
     type Item = (F0::Item, F1::Item); // TODO: (Option<F0::Item>, ...)
 
-    fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
-        if track!(self.fields.0.start_decoding(tag))? {
+    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
+        if track!(self.fields.0.start_decoding(tag, wire_type))? {
             Ok(true)
-        } else if track!(self.fields.1.start_decoding(tag))? {
+        } else if track!(self.fields.1.start_decoding(tag, wire_type))? {
             Ok(true)
         } else {
             Ok(false)
@@ -42,5 +43,9 @@ where
         let v0 = track!(self.fields.0.finish_decoding())?;
         let v1 = track!(self.fields.1.finish_decoding())?;
         Ok((v0, v1))
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        panic!()
     }
 }
