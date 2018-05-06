@@ -1,3 +1,6 @@
+// The smallest tag number you can specify is 1,
+// and the largest is 229 - 1, or 536,870,911.
+// You also cannot use the numbers 19000 through 19999
 /// Field tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Tag(pub u32);

@@ -9,6 +9,7 @@ pub use value::Value;
 
 pub mod field;
 pub mod message;
+pub mod scalar;
 pub mod wire;
 
 mod field_encoder;

@@ -5,6 +5,14 @@ use bytecodec::combinator::{Buffered, Length};
 use tag::Tag;
 use value::Value;
 
+pub trait WireDecode: Decode {
+    fn wire_type(&self) -> WireType;
+}
+
+pub trait WireEncode: Encode {
+    fn wire_type(&self) -> WireType;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WireType {
     Varint = 0,

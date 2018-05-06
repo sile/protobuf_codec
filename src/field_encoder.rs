@@ -1,8 +1,7 @@
-use bytecodec::{ByteCount, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Encode, Eos, ExactBytesEncode, Result};
 
 use tag::Tag;
-use value::Value;
-use wire::TagAndTypeEncoder;
+use wire::{TagAndTypeEncoder, WireEncode};
 
 pub trait FieldEncode: Encode {}
 
@@ -60,8 +59,7 @@ pub struct FieldEncoder<T, E> {
 impl<T, E> Encode for FieldEncoder<T, E>
 where
     T: Clone + Into<Tag>,
-    E: Encode,
-    E::Item: Value,
+    E: WireEncode,
 {
     type Item = E::Item;
 
@@ -73,7 +71,10 @@ where
     }
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let tag_and_type = (self.tag.clone().into(), item.wire_type());
+        let tag_and_type = (
+            self.tag.clone().into(),
+            self.field_value_encoder.wire_type(),
+        );
         track!(self.tag_and_type_encoder.start_encoding(tag_and_type))?;
         track!(self.field_value_encoder.start_encoding(item))?;
         Ok(())
@@ -92,8 +93,7 @@ where
 impl<T, E> ExactBytesEncode for FieldEncoder<T, E>
 where
     T: Clone + Into<Tag>,
-    E: ExactBytesEncode,
-    E::Item: Value,
+    E: ExactBytesEncode + WireEncode,
 {
     fn exact_requiring_bytes(&self) -> u64 {
         self.tag_and_type_encoder.exact_requiring_bytes()
@@ -101,108 +101,108 @@ where
     }
 }
 
-// TODO: default
-#[derive(Debug, Default)]
-pub struct RepeatedFieldEncoder<T, F: IntoIterator, E> {
-    inner: FieldEncoder<T, E>,
-    field_values: Option<F::IntoIter>,
-}
-impl<T, F, E> Encode for RepeatedFieldEncoder<T, F, E>
-where
-    T: Clone + Into<Tag>,
-    F: IntoIterator,
-    E: Encode<Item = F::Item>,
-    E::Item: Value,
-{
-    type Item = F;
+// // TODO: default
+// #[derive(Debug, Default)]
+// pub struct RepeatedFieldEncoder<T, F: IntoIterator, E> {
+//     inner: FieldEncoder<T, E>,
+//     field_values: Option<F::IntoIter>,
+// }
+// impl<T, F, E> Encode for RepeatedFieldEncoder<T, F, E>
+// where
+//     T: Clone + Into<Tag>,
+//     F: IntoIterator,
+//     E: Encode<Item = F::Item>,
+//     E::Item: Value,
+// {
+//     type Item = F;
 
-    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-        let mut offset = 0;
-        while offset < buf.len() {
-            if self.inner.is_idle() {
-                if let Some(item) = self.field_values.as_mut().and_then(|x| x.next()) {
-                    track!(self.inner.start_encoding(item))?;
-                } else {
-                    self.field_values = None;
-                    break;
-                }
-            }
-            bytecodec_try_encode!(self.inner, offset, buf, eos);
-        }
-        Ok(offset)
-    }
+//     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+//         let mut offset = 0;
+//         while offset < buf.len() {
+//             if self.inner.is_idle() {
+//                 if let Some(item) = self.field_values.as_mut().and_then(|x| x.next()) {
+//                     track!(self.inner.start_encoding(item))?;
+//                 } else {
+//                     self.field_values = None;
+//                     break;
+//                 }
+//             }
+//             bytecodec_try_encode!(self.inner, offset, buf, eos);
+//         }
+//         Ok(offset)
+//     }
 
-    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        track_assert!(self.is_idle(), ErrorKind::EncoderFull);
-        self.field_values = Some(item.into_iter());
-        Ok(())
-    }
+//     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+//         track_assert!(self.is_idle(), ErrorKind::EncoderFull);
+//         self.field_values = Some(item.into_iter());
+//         Ok(())
+//     }
 
-    fn is_idle(&self) -> bool {
-        self.field_values.is_none()
-    }
+//     fn is_idle(&self) -> bool {
+//         self.field_values.is_none()
+//     }
 
-    fn requiring_bytes(&self) -> ByteCount {
-        if self.is_idle() {
-            ByteCount::Finite(0)
-        } else {
-            ByteCount::Unknown
-        }
-    }
-}
+//     fn requiring_bytes(&self) -> ByteCount {
+//         if self.is_idle() {
+//             ByteCount::Finite(0)
+//         } else {
+//             ByteCount::Unknown
+//         }
+//     }
+// }
 
-// TODO: default
-#[derive(Debug, Default)]
-pub struct PackedRepeatedFieldEncoder<T, F: IntoIterator, E> {
-    tag: T,
-    tag_and_type_encoder: TagAndTypeEncoder,
-    field_value_encoder: E,
-    field_values: Option<F::IntoIter>,
-}
-impl<T, F, E> Encode for PackedRepeatedFieldEncoder<T, F, E>
-where
-    T: Clone + Into<Tag>,
-    F: IntoIterator,
-    E: Encode<Item = F::Item>,
-    E::Item: Value, // TODO: FixedLengthValue
-{
-    type Item = F;
+// // TODO: default
+// #[derive(Debug, Default)]
+// pub struct PackedRepeatedFieldEncoder<T, F: IntoIterator, E> {
+//     tag: T,
+//     tag_and_type_encoder: TagAndTypeEncoder,
+//     field_value_encoder: E,
+//     field_values: Option<F::IntoIter>,
+// }
+// impl<T, F, E> Encode for PackedRepeatedFieldEncoder<T, F, E>
+// where
+//     T: Clone + Into<Tag>,
+//     F: IntoIterator,
+//     E: Encode<Item = F::Item>,
+//     E::Item: Value, // TODO: FixedLengthValue
+// {
+//     type Item = F;
 
-    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
-        let mut offset = 0;
-        bytecodec_try_encode!(self.tag_and_type_encoder, offset, buf, eos);
+//     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+//         let mut offset = 0;
+//         bytecodec_try_encode!(self.tag_and_type_encoder, offset, buf, eos);
 
-        while offset < buf.len() {
-            if self.field_value_encoder.is_idle() {
-                if let Some(item) = self.field_values.as_mut().and_then(|x| x.next()) {
-                    track!(self.field_value_encoder.start_encoding(item))?;
-                } else {
-                    self.field_values = None;
-                    break;
-                }
-            }
-            bytecodec_try_encode!(self.field_value_encoder, offset, buf, eos);
-        }
-        Ok(offset)
-    }
+//         while offset < buf.len() {
+//             if self.field_value_encoder.is_idle() {
+//                 if let Some(item) = self.field_values.as_mut().and_then(|x| x.next()) {
+//                     track!(self.field_value_encoder.start_encoding(item))?;
+//                 } else {
+//                     self.field_values = None;
+//                     break;
+//                 }
+//             }
+//             bytecodec_try_encode!(self.field_value_encoder, offset, buf, eos);
+//         }
+//         Ok(offset)
+//     }
 
-    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        track_assert!(self.is_idle(), ErrorKind::EncoderFull);
-        let tag_and_type = (self.tag.clone().into(), E::Item::default().wire_type());
-        track!(self.tag_and_type_encoder.start_encoding(tag_and_type))?;
-        self.field_values = Some(item.into_iter());
-        Ok(())
-    }
+//     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+//         track_assert!(self.is_idle(), ErrorKind::EncoderFull);
+//         let tag_and_type = (self.tag.clone().into(), E::Item::default().wire_type());
+//         track!(self.tag_and_type_encoder.start_encoding(tag_and_type))?;
+//         self.field_values = Some(item.into_iter());
+//         Ok(())
+//     }
 
-    fn is_idle(&self) -> bool {
-        self.field_values.is_none()
-    }
+//     fn is_idle(&self) -> bool {
+//         self.field_values.is_none()
+//     }
 
-    fn requiring_bytes(&self) -> ByteCount {
-        if self.is_idle() {
-            ByteCount::Finite(0)
-        } else {
-            ByteCount::Unknown
-        }
-    }
-}
+//     fn requiring_bytes(&self) -> ByteCount {
+//         if self.is_idle() {
+//             ByteCount::Finite(0)
+//         } else {
+//             ByteCount::Unknown
+//         }
+//     }
+// }

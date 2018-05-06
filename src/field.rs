@@ -13,12 +13,13 @@ use wire::LengthDelimitedDecoder;
 pub trait FieldDecode {
     type Item;
 
-    fn start_decoding(&mut self, tag: Tag) -> Result<bool>;
+    fn start_decoding(&mut self, tag: Tag) -> Result<bool>; // TODO: add wire_type
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize>;
     fn is_decoding(&self) -> bool;
     fn finish_decoding(&mut self) -> Result<Self::Item>;
 }
 
+// singular: a well-formed message can have zero or one of this field (but not more than one).
 #[derive(Debug, Default)]
 pub struct FieldDecoder<T, D: Decode> {
     tag: T,
@@ -47,6 +48,11 @@ where
             Ok(false)
         } else {
             track_assert!(!self.is_decoding, ErrorKind::Other);
+            // TODO:
+            // > For numeric types and strings, if the same field appears multiple times,
+            // > the parser accepts the last value it sees. For embedded message fields,
+            // > the parser merges multiple instances of the same field,
+            // > as if with the Message::MergeFrom method
             track_assert!(
                 self.value.has_item(),
                 ErrorKind::InvalidInput,
@@ -126,6 +132,12 @@ where
     }
 }
 
+// Only repeated fields of primitive numeric types
+// (types which use the varint, 32-bit, or 64-bit wire types) can be declared "packed".
+//
+// Protocol buffer parsers must be able to parse repeated fields that were compiled as packed
+// as if they were not packed, and vice versa.
+// This permits adding [packed=true] to existing fields in a forward- and backward-compatible way.
 #[derive(Debug, Default)]
 pub struct PackedRepeatedFieldDecoder<T, V, D>
 where
@@ -149,6 +161,11 @@ where
             Ok(false)
         } else {
             track_assert!(!self.is_decoding, ErrorKind::Other);
+            // TODO:
+            // > For numeric types and strings, if the same field appears multiple times,
+            // > the parser accepts the last value it sees. For embedded message fields,
+            // > the parser merges multiple instances of the same field,
+            // > as if with the Message::MergeFrom method
             track_assert!(
                 self.value.has_item(),
                 ErrorKind::InvalidInput,
@@ -181,6 +198,8 @@ where
     }
 }
 
+// where the key_type can be any integral or string type
+//  (so, any scalar type except for floating point types and bytes).
 #[derive(Debug, Default)]
 pub struct MapFieldDecoder<T, F, K, V>
 where
@@ -275,3 +294,5 @@ where
         }
     }
 }
+
+// UnknownFieldDecoder
