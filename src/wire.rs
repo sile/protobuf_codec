@@ -3,7 +3,6 @@ use bytecodec::bytes::BytesEncoder;
 use bytecodec::combinator::{Buffered, Length};
 
 use tag::Tag;
-use value::Value;
 
 pub trait WireDecode: Decode {
     fn wire_type(&self) -> WireType;
@@ -236,14 +235,6 @@ impl<E: ExactBytesEncode> Encode for LengthDelimitedEncoder<E> {
 impl<E: ExactBytesEncode> ExactBytesEncode for LengthDelimitedEncoder<E> {
     fn exact_requiring_bytes(&self) -> u64 {
         self.len.exact_requiring_bytes() + self.inner.exact_requiring_bytes()
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct LengthDelimited<T>(pub T);
-impl<T: Default> Value for LengthDelimited<T> {
-    fn wire_type(&self) -> WireType {
-        WireType::LengthDelimited
     }
 }
 
