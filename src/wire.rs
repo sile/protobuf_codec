@@ -48,7 +48,8 @@ impl Decode for TagAndTypeDecoder {
                     track_panic!(ErrorKind::InvalidInput, "Unknown wire type"; wire_type, tag)
                 }
             };
-            Ok((size, Some((Tag(tag as u32), wire_type))))
+            let tag = track!(Tag::new(tag as u32))?;
+            Ok((size, Some((tag, wire_type))))
         } else {
             Ok((size, None))
         }
@@ -74,7 +75,7 @@ impl Encode for TagAndTypeEncoder {
     }
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let n = (u64::from((item.0).0) << 3) | (item.1 as u64);
+        let n = u64::from(item.0.as_u32() << 3) | (item.1 as u64);
         track!(self.0.start_encoding(n))
     }
 

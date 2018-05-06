@@ -6,7 +6,7 @@ use bytecodec::{Eos, Result};
 
 pub use fields::FieldsDecoder;
 
-use Tag;
+use tag::Tag;
 // use message::EmbeddedMessageDecoder;
 // use tag::{Tag1, Tag2};
 // use wire::LengthDelimitedDecoder;
