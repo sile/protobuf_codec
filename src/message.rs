@@ -5,7 +5,9 @@ use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder, WireDecode,
            WireEncode, WireType};
 
-pub trait MessageDecode: Decode {}
+pub trait MessageDecode: Decode {
+    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item;
+}
 
 pub trait MessageEncode: Encode {}
 impl<M: MessageEncode> MessageEncode for PreEncode<M> {}
@@ -70,7 +72,11 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
             .add_for_decoding(self.unknown_field.requiring_bytes())
     }
 }
-impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {}
+impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {
+    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
+        self.field.merge(old, new)
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct EmbeddedMessageDecoder<M>(LengthDelimitedDecoder<M>);
@@ -89,6 +95,15 @@ impl<M: MessageDecode> Decode for EmbeddedMessageDecoder<M> {
 impl<M: MessageDecode> WireDecode for EmbeddedMessageDecoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
+    }
+
+    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
+        match (old, new) {
+            (None, None) => None,
+            (None, Some(new)) => Some(new),
+            (Some(old), None) => Some(old),
+            (Some(old), Some(new)) => Some(self.0.inner_ref().merge(old, new)),
+        }
     }
 }
 

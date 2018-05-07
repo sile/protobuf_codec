@@ -48,4 +48,8 @@ where
     fn requiring_bytes(&self) -> ByteCount {
         panic!()
     }
+
+    fn merge(&self, _: Self::Item, _: Self::Item) -> Self::Item {
+        panic!()
+    }
 }

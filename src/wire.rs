@@ -10,6 +10,7 @@ use tag::Tag;
 // WireValueEncode
 pub trait WireDecode: Decode {
     fn wire_type(&self) -> WireType;
+    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item;
 }
 
 pub trait WireEncode: Encode {
@@ -130,6 +131,10 @@ impl Decode for VarintDecoder {
 impl WireDecode for VarintDecoder {
     fn wire_type(&self) -> WireType {
         WireType::Varint
+    }
+
+    fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+        new
     }
 }
 
@@ -260,6 +265,10 @@ impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
 impl<D: Decode> WireDecode for LengthDelimitedDecoder<D> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
+    }
+
+    fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+        new
     }
 }
 

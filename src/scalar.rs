@@ -36,6 +36,10 @@ macro_rules! impl_newtype_decode {
             fn wire_type(&self) -> WireType {
                 WireType::$wire
             }
+
+            fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+                new
+            }
         }
     }
 }
@@ -92,6 +96,10 @@ macro_rules! impl_varint_decode {
         impl WireDecode for $decoder {
             fn wire_type(&self) -> WireType {
                 WireType::Varint
+            }
+
+            fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+                new
             }
         }
     }
