@@ -1,3 +1,5 @@
+use std::iter;
+use std::mem;
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use bytecodec::bytes::CopyableBytesDecoder;
 use bytecodec::combinator::SkipRemaining;
@@ -32,53 +34,47 @@ pub struct FieldDecoder<T, D: WireDecode> {
     value: Option<D::Item>,
     is_decoding: bool,
 }
-// impl<T, D: Decode> FieldDecoder<T, D> {
-//     pub fn new(tag: T, value: D) -> Self {
-//         FieldDecoder {
-//             tag,
-//             value: value.buffered(),
-//             is_decoding: false,
-//         }
-//     }
-// }
+impl<T, D: WireDecode> FieldDecoder<T, D> {
+    pub fn new(tag: T, value_decoder: D) -> Self {
+        FieldDecoder {
+            tag,
+            decoder: value_decoder,
+            value: None,
+            is_decoding: false,
+        }
+    }
+}
 impl<T, D> FieldDecode for FieldDecoder<T, D>
 where
     T: Copy + Into<Tag>,
     D: WireDecode,
+    D::Item: Default,
 {
     type Item = D::Item;
 
     fn start_decoding(&mut self, tag: Tag, _: WireType) -> Result<bool> {
-        // if self.tag.into() != tag {
-        //     Ok(false)
-        // } else {
-        //     track_assert!(!self.is_decoding, ErrorKind::Other);
-        //     // TODO:
-        //     // > For numeric types and strings, if the same field appears multiple times,
-        //     // > the parser accepts the last value it sees. For embedded message fields,
-        //     // > the parser merges multiple instances of the same field,
-        //     // > as if with the Message::MergeFrom method
-        //     track_assert!(
-        //         self.value.has_item(),
-        //         ErrorKind::InvalidInput,
-        //         "This field can be appeared at most once: tag={}",
-        //         self.tag.into().0
-        //     );
-        //     self.is_decoding = true;
-        //     Ok(true)
-        // }
-        panic!()
+        if self.tag.into() != tag {
+            Ok(false)
+        } else {
+            track_assert!(!self.is_decoding, ErrorKind::Other);
+            self.is_decoding = true;
+            Ok(true)
+        }
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        // track_assert!(self.is_decoding, ErrorKind::Other);
+        track_assert!(self.is_decoding, ErrorKind::Other);
 
-        // let size = track!(self.value.decode(buf, eos), "tag={}", self.tag.into().0)?.0;
-        // if self.value.has_item() {
-        //     self.is_decoding = false;
-        // }
-        // Ok(size)
-        panic!()
+        let (size, item) = track!(self.decoder.decode(buf, eos); self.tag.into())?;
+        if let Some(new) = item {
+            self.is_decoding = false;
+            if let Some(old) = self.value.take() {
+                self.value = Some(self.decoder.merge(old, new));
+            } else {
+                self.value = Some(new);
+            }
+        }
+        Ok(size)
     }
 
     fn is_decoding(&self) -> bool {
@@ -86,18 +82,81 @@ where
     }
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
-        // track_assert!(!self.is_decoding, ErrorKind::InvalidInput);
-        // let value = self.value.take_item().unwrap_or_else(Default::default);
-        // Ok(value)
-        panic!()
+        track_assert!(!self.is_decoding, ErrorKind::InvalidInput);
+        let value = self.value.take().unwrap_or_else(Default::default);
+        Ok(value)
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        panic!()
+        if self.is_decoding {
+            self.decoder.requiring_bytes()
+        } else {
+            ByteCount::Finite(0)
+        }
     }
 
     fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
         self.decoder.merge(old, new)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct RepeatedFieldDecoder<T, V, D> {
+    tag: T,
+    decoder: D,
+    values: V,
+    is_decoding: bool,
+}
+impl<T, V, D> FieldDecode for RepeatedFieldDecoder<T, V, D>
+where
+    T: Copy + Into<Tag>,
+    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
+    D: WireDecode,
+{
+    type Item = V;
+
+    fn start_decoding(&mut self, tag: Tag, _: WireType) -> Result<bool> {
+        if self.tag.into() != tag {
+            Ok(false)
+        } else {
+            track_assert!(!self.is_decoding, ErrorKind::Other);
+            self.is_decoding = true;
+            Ok(true)
+        }
+    }
+
+    fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        track_assert!(self.is_decoding, ErrorKind::Other);
+
+        let (size, item) = track!(self.decoder.decode(buf, eos); self.tag.into())?;
+        if let Some(value) = item {
+            self.values.extend(iter::once(value));
+            self.is_decoding = false;
+        }
+        Ok(size)
+    }
+
+    fn is_decoding(&self) -> bool {
+        self.is_decoding
+    }
+
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        track_assert!(!self.is_decoding, ErrorKind::InvalidInput);
+        let values = mem::replace(&mut self.values, V::default());
+        Ok(values)
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        if self.is_decoding {
+            self.decoder.requiring_bytes()
+        } else {
+            ByteCount::Finite(0)
+        }
+    }
+
+    fn merge(&self, mut old: Self::Item, new: Self::Item) -> Self::Item {
+        old.extend(new.into_iter());
+        old
     }
 }
 
@@ -247,52 +306,68 @@ where
 {
 }
 
-// #[derive(Debug, Default)]
-// pub struct RepeatedFieldDecoder<T, V, D> {
-//     tag: T,
-//     value: D,
-//     values: V,
-//     is_decoding: bool,
-// }
-// impl<T, V, D> FieldDecode for RepeatedFieldDecoder<T, V, D>
-// where
-//     T: Copy + Into<Tag>,
-//     V: Default + Extend<D::Item>,
-//     D: Decode,
-// {
-//     type Item = V;
+#[derive(Debug)]
+pub struct RepeatedFieldEncoder<T, F: IntoIterator, E> {
+    inner: FieldEncoder<T, E>,
+    values: Option<F::IntoIter>,
+}
+impl<T: Default, F: IntoIterator, E: Default> Default for RepeatedFieldEncoder<T, F, E> {
+    fn default() -> Self {
+        RepeatedFieldEncoder {
+            inner: FieldEncoder::default(),
+            values: None,
+        }
+    }
+}
+impl<T, F, E> Encode for RepeatedFieldEncoder<T, F, E>
+where
+    T: Copy + Into<Tag>,
+    F: IntoIterator,
+    E: WireEncode<Item = F::Item>,
+{
+    type Item = F;
 
-//     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
-//         if self.tag.into() != tag {
-//             Ok(false)
-//         } else {
-//             track_assert!(!self.is_decoding, ErrorKind::Other);
-//             self.is_decoding = true;
-//             Ok(true)
-//         }
-//     }
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        let mut offset = 0;
+        while offset < buf.len() {
+            if self.inner.is_idle() {
+                if let Some(item) = self.values.as_mut().and_then(|x| x.next()) {
+                    track!(self.inner.start_encoding(item))?;
+                } else {
+                    self.values = None;
+                    break;
+                }
+            }
+            bytecodec_try_encode!(self.inner, offset, buf, eos);
+        }
+        Ok(offset)
+    }
 
-//     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-//         track_assert!(self.is_decoding, ErrorKind::Other);
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track_assert!(self.is_idle(), ErrorKind::EncoderFull);
+        self.values = Some(item.into_iter());
+        Ok(())
+    }
 
-//         let (size, item) = track!(self.value.decode(buf, eos), "tag={}", self.tag.into().0)?;
-//         if let Some(value) = item {
-//             self.values.extend(iter::once(value));
-//             self.is_decoding = false;
-//         }
-//         Ok(size)
-//     }
+    fn is_idle(&self) -> bool {
+        self.values.is_none()
+    }
 
-//     fn is_decoding(&self) -> bool {
-//         self.is_decoding
-//     }
-
-//     fn finish_decoding(&mut self) -> Result<Self::Item> {
-//         track_assert!(!self.is_decoding, ErrorKind::InvalidInput);
-//         let values = mem::replace(&mut self.values, V::default());
-//         Ok(values)
-//     }
-// }
+    fn requiring_bytes(&self) -> ByteCount {
+        if self.is_idle() {
+            ByteCount::Finite(0)
+        } else {
+            ByteCount::Unknown
+        }
+    }
+}
+impl<T, F, E> FieldEncode for RepeatedFieldEncoder<T, F, E>
+where
+    T: Copy + Into<Tag>,
+    F: IntoIterator,
+    E: WireEncode<Item = F::Item>,
+{
+}
 
 // // Only repeated fields of primitive numeric types
 // // (types which use the varint, 32-bit, or 64-bit wire types) can be declared "packed".
