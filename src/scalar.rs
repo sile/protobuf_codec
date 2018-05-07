@@ -33,11 +33,13 @@ macro_rules! impl_newtype_decode {
             }
         }
         impl WireDecode for $decoder {
+            type Value = $item;
+
             fn wire_type(&self) -> WireType {
                 WireType::$wire
             }
 
-            fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+            fn merge(&self, _old: Self::Value, new: Self::Item) -> Self::Value {
                 new
             }
         }
@@ -71,8 +73,17 @@ macro_rules! impl_newtype_encode {
             }
         }
         impl WireEncode for $encoder {
+            type Value = $item;
+
             fn wire_type(&self) -> WireType {
                 WireType::$wire
+            }
+
+            fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
+                if value != Default::default() {
+                    track!(self.start_encoding(value))?;
+                }
+                Ok(())
             }
         }
     }
@@ -94,11 +105,13 @@ macro_rules! impl_varint_decode {
             }
         }
         impl WireDecode for $decoder {
+            type Value = $item;
+
             fn wire_type(&self) -> WireType {
                 WireType::Varint
             }
 
-            fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+            fn merge(&self, _old: Self::Value, new: Self::Item) -> Self::Value {
                 new
             }
         }
@@ -132,8 +145,17 @@ macro_rules! impl_varint_encode {
             }
         }
         impl WireEncode for $encoder {
+            type Value = $item;
+
             fn wire_type(&self) -> WireType {
                 WireType::Varint
+            }
+
+            fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
+                if value != Default::default() {
+                    track!(self.start_encoding(value))?;
+                }
+                Ok(())
             }
         }
     }
@@ -488,6 +510,8 @@ impl BytesDecoder {
 }
 impl_newtype_decode!(BytesDecoder, Vec<u8>, LengthDelimited);
 
+// TODO: CustomBytesEncoder
+
 #[derive(Debug)]
 pub struct BytesEncoder<B = Vec<u8>>(LengthDelimitedEncoder<BytesEncoderInner<B>>);
 impl<B> BytesEncoder<B> {
@@ -525,8 +549,17 @@ impl<B: AsRef<[u8]>> ExactBytesEncode for BytesEncoder<B> {
     }
 }
 impl<B: AsRef<[u8]>> WireEncode for BytesEncoder<B> {
+    type Value = B;
+
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
+    }
+
+    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
+        if !value.as_ref().is_empty() {
+            track!(self.start_encoding(value))?;
+        }
+        Ok(())
     }
 }
 
@@ -577,8 +610,17 @@ impl<S: AsRef<str>> ExactBytesEncode for StringEncoder<S> {
     }
 }
 impl<S: AsRef<str>> WireEncode for StringEncoder<S> {
+    type Value = S;
+
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
+    }
+
+    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
+        if !value.as_ref().is_empty() {
+            track!(self.start_encoding(value))?;
+        }
+        Ok(())
     }
 }
 impl<S: AsRef<str>> MapKeyEncode for StringEncoder<S> {}

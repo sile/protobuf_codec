@@ -31,7 +31,7 @@ pub type MessageFieldDecoder<T, M> = FieldDecoder<T, EmbeddedMessageDecoder<M>>;
 pub struct FieldDecoder<T, D: WireDecode> {
     tag: T,
     decoder: D,
-    value: Option<D::Item>,
+    value: D::Value,
     is_decoding: bool,
 }
 impl<T, D: WireDecode> FieldDecoder<T, D> {
@@ -39,7 +39,7 @@ impl<T, D: WireDecode> FieldDecoder<T, D> {
         FieldDecoder {
             tag,
             decoder: value_decoder,
-            value: None,
+            value: D::Value::default(),
             is_decoding: false,
         }
     }
@@ -48,9 +48,8 @@ impl<T, D> FieldDecode for FieldDecoder<T, D>
 where
     T: Copy + Into<Tag>,
     D: WireDecode,
-    D::Item: Default,
 {
-    type Item = D::Item;
+    type Item = D::Value;
 
     fn start_decoding(&mut self, tag: Tag, _: WireType) -> Result<bool> {
         if self.tag.into() != tag {
@@ -68,11 +67,10 @@ where
         let (size, item) = track!(self.decoder.decode(buf, eos); self.tag.into())?;
         if let Some(new) = item {
             self.is_decoding = false;
-            if let Some(old) = self.value.take() {
-                self.value = Some(self.decoder.merge(old, new));
-            } else {
-                self.value = Some(new);
-            }
+            self.value = self.decoder.merge(
+                mem::replace(&mut self.value, D::Value::default()),
+                new.into(),
+            );
         }
         Ok(size)
     }
@@ -83,7 +81,7 @@ where
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
         track_assert!(!self.is_decoding, ErrorKind::InvalidInput);
-        let value = self.value.take().unwrap_or_else(Default::default);
+        let value = mem::replace(&mut self.value, D::Value::default());
         Ok(value)
     }
 
@@ -250,7 +248,11 @@ pub struct FieldEncoder<T, E> {
     tag_and_type: TagAndTypeEncoder,
     value: E,
 }
-impl<T, E> FieldEncoder<T, E> {
+impl<T, E> FieldEncoder<T, E>
+where
+    T: Copy + Into<Tag>,
+    E: WireEncode,
+{
     pub fn new(tag: T, value_encoder: E) -> Self {
         FieldEncoder {
             tag,
@@ -258,13 +260,20 @@ impl<T, E> FieldEncoder<T, E> {
             value: value_encoder,
         }
     }
+
+    fn force_start_encoding(&mut self, item: E::Item) -> Result<()> {
+        let tag_and_type = (self.tag.into(), self.value.wire_type());
+        track!(self.tag_and_type.start_encoding(tag_and_type))?;
+        track!(self.value.start_encoding(item))?;
+        Ok(())
+    }
 }
 impl<T, E> Encode for FieldEncoder<T, E>
 where
     T: Copy + Into<Tag>,
     E: WireEncode,
 {
-    type Item = E::Item;
+    type Item = E::Value;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         let mut offset = 0;
@@ -274,9 +283,11 @@ where
     }
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let tag_and_type = (self.tag.into(), self.value.wire_type());
-        track!(self.tag_and_type.start_encoding(tag_and_type))?;
-        track!(self.value.start_encoding(item))?;
+        track!(self.value.start_encoding_value(item))?;
+        if !self.value.is_idle() {
+            let tag_and_type = (self.tag.into(), self.value.wire_type());
+            track!(self.tag_and_type.start_encoding(tag_and_type))?;
+        }
         Ok(())
     }
 
@@ -332,7 +343,7 @@ where
         while offset < buf.len() {
             if self.inner.is_idle() {
                 if let Some(item) = self.values.as_mut().and_then(|x| x.next()) {
-                    track!(self.inner.start_encoding(item))?;
+                    track!(self.inner.force_start_encoding(item))?;
                 } else {
                     self.values = None;
                     break;

@@ -81,11 +81,10 @@ impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {
 #[derive(Debug, Default)]
 pub struct EmbeddedMessageDecoder<M>(LengthDelimitedDecoder<M>);
 impl<M: MessageDecode> Decode for EmbeddedMessageDecoder<M> {
-    type Item = Option<M::Item>;
+    type Item = M::Item;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-        let (size, item) = track!(self.0.decode(buf, eos))?;
-        Ok((size, item.map(Some)))
+        track!(self.0.decode(buf, eos))
     }
 
     fn requiring_bytes(&self) -> ByteCount {
@@ -93,15 +92,17 @@ impl<M: MessageDecode> Decode for EmbeddedMessageDecoder<M> {
     }
 }
 impl<M: MessageDecode> WireDecode for EmbeddedMessageDecoder<M> {
+    type Value = Option<M::Item>;
+
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
 
-    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
+    fn merge(&self, old: Self::Value, new: Self::Value) -> Self::Value {
         match (old, new) {
             (None, None) => None,
-            (None, Some(new)) => Some(new),
             (Some(old), None) => Some(old),
+            (None, Some(new)) => Some(new),
             (Some(old), Some(new)) => Some(self.0.inner_ref().merge(old, new)),
         }
     }
@@ -180,7 +181,16 @@ impl<M: MessageEncode + ExactBytesEncode> ExactBytesEncode for EmbeddedMessageEn
     }
 }
 impl<M: MessageEncode + ExactBytesEncode> WireEncode for EmbeddedMessageEncoder<M> {
+    type Value = Option<M::Item>;
+
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
+    }
+
+    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
+        if let Some(item) = value {
+            track!(self.start_encoding(item))?;
+        }
+        Ok(())
     }
 }

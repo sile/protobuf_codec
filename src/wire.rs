@@ -7,14 +7,19 @@ use bytecodec::combinator::{Buffered, Length};
 
 use tag::Tag;
 
-// WireValueEncode
+// WireValueDecode or FieldValueDecode
 pub trait WireDecode: Decode {
+    type Value: Default + From<Self::Item>;
+
     fn wire_type(&self) -> WireType;
-    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item;
+    fn merge(&self, old: Self::Value, new: Self::Value) -> Self::Value; // TODO: name
 }
 
 pub trait WireEncode: Encode {
+    type Value;
+
     fn wire_type(&self) -> WireType;
+    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -129,11 +134,13 @@ impl Decode for VarintDecoder {
     }
 }
 impl WireDecode for VarintDecoder {
+    type Value = u64;
+
     fn wire_type(&self) -> WireType {
         WireType::Varint
     }
 
-    fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+    fn merge(&self, _old: Self::Value, new: Self::Item) -> Self::Value {
         new
     }
 }
@@ -182,11 +189,18 @@ impl ExactBytesEncode for VarintEncoder {
         self.0.exact_requiring_bytes()
     }
 }
-impl WireEncode for VarintEncoder {
-    fn wire_type(&self) -> WireType {
-        WireType::Varint
-    }
-}
+// TODO: delete
+// impl WireEncode for VarintEncoder {
+//     type Value = u64;
+
+//     fn wire_type(&self) -> WireType {
+//         WireType::Varint
+//     }
+
+//     fn is_default_value(&self, value: &Self::Value) -> bool {
+//         *value == 0
+//     }
+// }
 
 #[derive(Debug)]
 struct VarintBuf {
@@ -262,15 +276,17 @@ impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
             .add_for_decoding(self.inner.requiring_bytes())
     }
 }
-impl<D: Decode> WireDecode for LengthDelimitedDecoder<D> {
-    fn wire_type(&self) -> WireType {
-        WireType::LengthDelimited
-    }
+// impl<D: Decode> WireDecode for LengthDelimitedDecoder<D> {
+//     type Value = D::Item;
 
-    fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
-        new
-    }
-}
+//     fn wire_type(&self) -> WireType {
+//         WireType::LengthDelimited
+//     }
+
+//     fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
+//         new
+//     }
+// }
 
 #[derive(Debug, Default)]
 pub struct LengthDelimitedEncoder<E> {
@@ -326,11 +342,12 @@ impl<E: ExactBytesEncode> ExactBytesEncode for LengthDelimitedEncoder<E> {
         self.len.exact_requiring_bytes() + self.inner.exact_requiring_bytes()
     }
 }
-impl<E: ExactBytesEncode> WireEncode for LengthDelimitedEncoder<E> {
-    fn wire_type(&self) -> WireType {
-        WireType::LengthDelimited
-    }
-}
+// TOOD: delete
+// impl<E: ExactBytesEncode> WireEncode for LengthDelimitedEncoder<E> {
+//     fn wire_type(&self) -> WireType {
+//         WireType::LengthDelimited
+//     }
+// }
 
 #[cfg(test)]
 mod test {
