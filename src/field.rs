@@ -5,6 +5,7 @@ use bytecodec::combinator::SkipRemaining;
 use bytecodec::value::NullDecoder;
 
 pub use fields::{FieldsDecoder, FieldsEncoder};
+pub use oneof::{OneOf2, OneOf3, OneOf4, OneOf5, OneOf6, OneOf7, OneOf8};
 pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, PackedRepeatedFieldDecoder,
                          PackedRepeatedFieldEncoder, RepeatedFieldDecoder, RepeatedFieldEncoder,
                          RepeatedNumericFieldDecoder};
@@ -258,61 +259,6 @@ where
     E: WireEncode,
 {
 }
-
-// #[derive(Debug)]
-// pub enum OneOf2<A, B> {
-//     A(A),
-//     B(B),
-//     None,
-// }
-
-// #[derive(Debug, Default)]
-// pub struct OneOfDecoder<F> {
-//     fields: F,
-//     last: usize,
-// }
-// impl<F0, F1> FieldDecode for OneOfDecoder<(F0, F1)>
-// where
-//     F0: FieldDecode, // TODO: SingularFieldDecode
-//     F1: FieldDecode,
-// {
-//     type Item = OneOf2<F0::Item, F1::Item>;
-
-//     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
-//         if track!(self.fields.0.start_decoding(tag))? {
-//             self.last = 1;
-//             Ok(true)
-//         } else if track!(self.fields.1.start_decoding(tag))? {
-//             self.last = 2;
-//             Ok(true)
-//         } else {
-//             Ok(false)
-//         }
-//     }
-
-//     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-//         if self.fields.0.is_decoding() {
-//             track!(self.fields.0.field_decode(buf, eos))
-//         } else if self.fields.1.is_decoding() {
-//             track!(self.fields.1.field_decode(buf, eos))
-//         } else {
-//             track_panic!(ErrorKind::Other)
-//         }
-//     }
-
-//     fn is_decoding(&self) -> bool {
-//         self.fields.0.is_decoding() || self.fields.1.is_decoding()
-//     }
-
-//     fn finish_decoding(&mut self) -> Result<Self::Item> {
-//         match self.last {
-//             0 => Ok(OneOf2::None),
-//             1 => track!(self.fields.0.finish_decoding()).map(OneOf2::A),
-//             2 => track!(self.fields.1.finish_decoding()).map(OneOf2::B),
-//             _ => unreachable!(),
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod test {

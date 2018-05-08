@@ -10,4 +10,5 @@ pub mod tag;
 pub mod wire;
 
 mod fields;
+mod oneof;
 mod repeated_field;
