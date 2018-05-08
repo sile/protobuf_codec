@@ -1,12 +1,17 @@
+use std::fmt;
 use std::iter;
 use std::mem;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result};
+use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use bytecodec::combinator::Collect;
 
-use field::{FieldDecode, FieldEncode, FieldEncoder};
-use scalar::{NumericDecode, NumericEncode};
-use tag::Tag;
+use field::{FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, FieldsDecoder, FieldsEncoder};
+use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder, MessageDecoder, MessageEncoder};
+use scalar::{MapKeyDecode, MapKeyEncode, NumericDecode, NumericEncode};
+use tag::{Tag, Tag1, Tag2};
 use wire::{LengthDelimitedDecoder, TagAndTypeEncoder, WireDecode, WireEncode, WireType};
+
+pub type RepeatedMessageFieldDecoder<T, V, D> =
+    RepeatedFieldDecoder<T, V, EmbeddedMessageDecoder<D>>;
 
 #[derive(Debug, Default)]
 pub struct RepeatedFieldDecoder<T, V, D> {
@@ -209,47 +214,61 @@ where
     }
 }
 
-// // where the key_type can be any integral or string type
-// //  (so, any scalar type except for floating point types and bytes).
-// #[derive(Debug, Default)]
-// pub struct MapFieldDecoder<T, F, K, V>
-// where
-//     K: Decode,
-//     V: Decode,
-// {
-//     inner: RepeatedFieldDecoder<
-//         T,
-//         F,
-//         EmbeddedMessageDecoder<FieldsDecoder<(FieldDecoder<Tag1, K>, FieldDecoder<Tag2, V>)>>,
-//     >,
-// }
-// impl<T, F, K, V> FieldDecode for MapFieldDecoder<T, F, K, V>
-// where
-//     T: Copy + Into<Tag>,
-//     F: Default + Extend<(K::Item, V::Item)>,
-//     K: Decode,
-//     K::Item: Value,
-//     V: Decode,
-//     V::Item: Value,
-// {
-//     type Item = F;
+#[derive(Default)]
+pub struct MapFieldDecoder<T, M, K, V>
+where
+    K: MapKeyDecode,
+    V: WireDecode,
+{
+    inner: RepeatedMessageFieldDecoder<
+        T,
+        M,
+        MessageDecoder<FieldsDecoder<(FieldDecoder<Tag1, K>, FieldDecoder<Tag2, V>)>>,
+    >,
+}
+impl<T, M, K, V> FieldDecode for MapFieldDecoder<T, M, K, V>
+where
+    T: Copy + Into<Tag>,
+    M: Default + Extend<(K::Value, V::Value)> + IntoIterator<Item = (K::Value, V::Value)>,
+    K: MapKeyDecode,
+    V: WireDecode,
+{
+    type Item = M;
 
-//     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
-//         track!(self.inner.start_decoding(tag))
-//     }
+    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
+        track!(self.inner.start_decoding(tag, wire_type))
+    }
 
-//     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-//         track!(self.inner.field_decode(buf, eos))
-//     }
+    fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        track!(self.inner.field_decode(buf, eos))
+    }
 
-//     fn is_decoding(&self) -> bool {
-//         self.inner.is_decoding()
-//     }
+    fn is_decoding(&self) -> bool {
+        self.inner.is_decoding()
+    }
 
-//     fn finish_decoding(&mut self) -> Result<Self::Item> {
-//         track!(self.inner.finish_decoding())
-//     }
-// }
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        track!(self.inner.finish_decoding())
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.inner.requiring_bytes()
+    }
+
+    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
+        self.inner.merge(old, new)
+    }
+}
+impl<T, M, K, V> fmt::Debug for MapFieldDecoder<T, M, K, V>
+where
+    K: MapKeyDecode,
+    V: WireDecode,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MapFieldDecoder {{ .. }}")
+    }
+}
+
 #[derive(Debug)]
 pub struct RepeatedFieldEncoder<T, F: IntoIterator, E> {
     inner: FieldEncoder<T, E>,
@@ -266,8 +285,8 @@ impl<T: Default, F: IntoIterator, E: Default> Default for RepeatedFieldEncoder<T
 impl<T, F, E> Encode for RepeatedFieldEncoder<T, F, E>
 where
     T: Copy + Into<Tag>,
-    F: IntoIterator,
-    E: WireEncode<Item = F::Item>,
+    F: IntoIterator<Item = E::Item>,
+    E: WireEncode,
 {
     type Item = F;
 
@@ -308,8 +327,8 @@ where
 impl<T, F, E> FieldEncode for RepeatedFieldEncoder<T, F, E>
 where
     T: Copy + Into<Tag>,
-    F: IntoIterator,
-    E: WireEncode<Item = F::Item>,
+    F: IntoIterator<Item = E::Item>,
+    E: WireEncode,
 {
 }
 
@@ -333,8 +352,8 @@ impl<T: Default, F: IntoIterator, E: Default> Default for PackedRepeatedFieldEnc
 impl<T, F, E> Encode for PackedRepeatedFieldEncoder<T, F, E>
 where
     T: Copy + Into<Tag>,
-    F: IntoIterator,
-    E: NumericEncode<Item = F::Item>,
+    F: IntoIterator<Item = E::Item>,
+    E: NumericEncode,
 {
     type Item = F;
 
@@ -379,7 +398,69 @@ where
 impl<T, F, E> FieldEncode for PackedRepeatedFieldEncoder<T, F, E>
 where
     T: Copy + Into<Tag>,
-    F: IntoIterator,
-    E: NumericEncode<Item = F::Item>,
+    F: IntoIterator<Item = E::Item>,
+    E: NumericEncode,
 {
+}
+
+// pub fn test<K, V>()
+// where
+//     K: Default + ExactBytesEncode + MapKeyEncode,
+//     V: Default + ExactBytesEncode + WireEncode,
+// {
+//     let x: FieldsEncoder<(FieldEncoder<Tag1, K>, FieldEncoder<Tag2, V>)> = Default::default();
+//     x.is_idle();
+
+//     let x: MessageEncoder<FieldsEncoder<(FieldEncoder<Tag1, K>, FieldEncoder<Tag2, V>)>> =
+//         Default::default();
+//     x.is_idle();
+// }
+
+#[derive(Default)]
+pub struct MapFieldEncoder<T, M: IntoIterator, K, V> {
+    inner: RepeatedFieldEncoder<
+        T,
+        M,
+        EmbeddedMessageEncoder<
+            MessageEncoder<FieldsEncoder<(FieldEncoder<Tag1, K>, FieldEncoder<Tag2, V>)>>,
+        >,
+    >,
+}
+impl<T, M, K, V> Encode for MapFieldEncoder<T, M, K, V>
+where
+    T: Copy + Into<Tag>,
+    M: IntoIterator<Item = (K::Value, V::Value)>,
+    K: ExactBytesEncode + MapKeyEncode,
+    V: ExactBytesEncode + WireEncode,
+{
+    type Item = M;
+
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        track!(self.inner.encode(buf, eos))
+    }
+
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track!(self.inner.start_encoding(item))
+    }
+
+    fn is_idle(&self) -> bool {
+        self.inner.is_idle()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.inner.requiring_bytes()
+    }
+}
+impl<T, M, K, V> FieldEncode for MapFieldEncoder<T, M, K, V>
+where
+    T: Copy + Into<Tag>,
+    M: IntoIterator<Item = (K::Value, V::Value)>,
+    K: ExactBytesEncode + MapKeyEncode,
+    V: ExactBytesEncode + WireEncode,
+{
+}
+impl<T, M: IntoIterator, K, V> fmt::Debug for MapFieldEncoder<T, M, K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MapFieldEncoder {{ .. }}")
+    }
 }

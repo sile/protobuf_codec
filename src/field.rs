@@ -4,7 +4,10 @@ use bytecodec::bytes::CopyableBytesDecoder;
 use bytecodec::combinator::SkipRemaining;
 use bytecodec::value::NullDecoder;
 
-pub use fields::FieldsDecoder;
+pub use fields::{FieldsDecoder, FieldsEncoder};
+pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, PackedRepeatedFieldDecoder,
+                         PackedRepeatedFieldEncoder, RepeatedFieldDecoder, RepeatedFieldEncoder,
+                         RepeatedNumericFieldDecoder};
 
 use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder};
 use tag::Tag;
