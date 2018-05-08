@@ -11,3 +11,4 @@ pub mod wire;
 
 mod field_encoder; // TODO: delete
 mod fields;
+mod repeated_field;
