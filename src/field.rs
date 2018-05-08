@@ -8,6 +8,7 @@ use bytecodec::value::NullDecoder;
 pub use fields::FieldsDecoder;
 
 use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder};
+use scalar::NumericEncode;
 use tag::Tag;
 use wire::{LengthDelimitedDecoder, TagAndTypeEncoder, VarintDecoder, WireDecode, WireEncode,
            WireType};
@@ -377,6 +378,77 @@ where
     T: Copy + Into<Tag>,
     F: IntoIterator,
     E: WireEncode<Item = F::Item>,
+{
+}
+
+#[derive(Debug)]
+pub struct PackedRepeatedFieldEncoder<T, F: IntoIterator, E> {
+    tag: T,
+    values: Option<F::IntoIter>,
+    tag_and_type_encoder: TagAndTypeEncoder,
+    value_encoder: E,
+}
+impl<T: Default, F: IntoIterator, E: Default> Default for PackedRepeatedFieldEncoder<T, F, E> {
+    fn default() -> Self {
+        PackedRepeatedFieldEncoder {
+            tag: T::default(),
+            values: None,
+            tag_and_type_encoder: TagAndTypeEncoder::new(),
+            value_encoder: E::default(),
+        }
+    }
+}
+impl<T, F, E> Encode for PackedRepeatedFieldEncoder<T, F, E>
+where
+    T: Copy + Into<Tag>,
+    F: IntoIterator,
+    E: NumericEncode<Item = F::Item>,
+{
+    type Item = F;
+
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        let mut offset = 0;
+        bytecodec_try_encode!(self.tag_and_type_encoder, offset, buf, eos);
+
+        while offset < buf.len() {
+            if self.value_encoder.is_idle() {
+                if let Some(item) = self.values.as_mut().and_then(|x| x.next()) {
+                    track!(self.value_encoder.start_encoding(item))?;
+                } else {
+                    self.values = None;
+                    break;
+                }
+            }
+            bytecodec_try_encode!(self.value_encoder, offset, buf, eos);
+        }
+        Ok(offset)
+    }
+
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track_assert!(self.is_idle(), ErrorKind::EncoderFull);
+        let tag_and_type = (self.tag.into(), self.value_encoder.wire_type());
+        track!(self.tag_and_type_encoder.start_encoding(tag_and_type))?;
+        self.values = Some(item.into_iter());
+        Ok(())
+    }
+
+    fn is_idle(&self) -> bool {
+        self.values.is_none()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        if self.is_idle() {
+            ByteCount::Finite(0)
+        } else {
+            ByteCount::Unknown
+        }
+    }
+}
+impl<T, F, E> FieldEncode for PackedRepeatedFieldEncoder<T, F, E>
+where
+    T: Copy + Into<Tag>,
+    F: IntoIterator,
+    E: NumericEncode<Item = F::Item>,
 {
 }
 
