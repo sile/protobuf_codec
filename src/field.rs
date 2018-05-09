@@ -26,7 +26,11 @@ pub trait FieldDecode {
     fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item;
 }
 
+pub trait SingularFieldDecode: FieldDecode {}
+
 pub trait FieldEncode: Encode {}
+
+pub trait SingularFieldEncode: FieldEncode {}
 
 pub type MessageFieldDecoder<T, M> = FieldDecoder<T, EmbeddedMessageDecoder<M>>;
 
@@ -92,13 +96,19 @@ where
         if self.is_decoding {
             self.decoder.requiring_bytes()
         } else {
-            ByteCount::Finite(0)
+            ByteCount::Unknown
         }
     }
 
     fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
         self.decoder.merge(old, new)
     }
+}
+impl<T, D> SingularFieldDecode for FieldDecoder<T, D>
+where
+    T: Copy + Into<Tag>,
+    D: WireDecode,
+{
 }
 
 #[derive(Debug)]
@@ -254,6 +264,12 @@ where
     }
 }
 impl<T, E> FieldEncode for FieldEncoder<T, E>
+where
+    T: Copy + Into<Tag>,
+    E: WireEncode,
+{
+}
+impl<T, E> SingularFieldEncode for FieldEncoder<T, E>
 where
     T: Copy + Into<Tag>,
     E: WireEncode,
