@@ -8,8 +8,8 @@ use bytecodec::fixnum::{F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, 
                         I32leEncoder, I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder,
                         U64leDecoder, U64leEncoder};
 
-use field::{MapKeyDecode, MapKeyEncode, NumericDecode, NumericEncode, OptionalValueDecode,
-            OptionalValueEncode, ValueDecode, ValueEncode};
+use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode,
+            OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType};
 
 macro_rules! impl_newtype_decode {
@@ -168,7 +168,7 @@ impl DoubleDecoder {
     }
 }
 impl_newtype_decode!(DoubleDecoder, f64, Bit64);
-impl NumericDecode for DoubleDecoder {}
+impl NumericValueDecode for DoubleDecoder {}
 
 #[derive(Debug, Default)]
 pub struct DoubleEncoder(F64leEncoder);
@@ -178,7 +178,7 @@ impl DoubleEncoder {
     }
 }
 impl_newtype_encode!(DoubleEncoder, f64, Bit64);
-impl NumericEncode for DoubleEncoder {}
+impl NumericValueEncode for DoubleEncoder {}
 
 #[derive(Debug, Default)]
 pub struct FloatDecoder(F32leDecoder);
@@ -188,7 +188,7 @@ impl FloatDecoder {
     }
 }
 impl_newtype_decode!(FloatDecoder, f32, Bit32);
-impl NumericDecode for FloatDecoder {}
+impl NumericValueDecode for FloatDecoder {}
 
 #[derive(Debug, Default)]
 pub struct FloatEncoder(F32leEncoder);
@@ -198,7 +198,7 @@ impl FloatEncoder {
     }
 }
 impl_newtype_encode!(FloatEncoder, f32, Bit32);
-impl NumericEncode for FloatEncoder {}
+impl NumericValueEncode for FloatEncoder {}
 
 #[derive(Debug, Default)]
 pub struct Fixed32Decoder(U32leDecoder);
@@ -209,7 +209,7 @@ impl Fixed32Decoder {
 }
 impl_newtype_decode!(Fixed32Decoder, u32, Bit32);
 impl MapKeyDecode for Fixed32Decoder {}
-impl NumericDecode for Fixed32Decoder {}
+impl NumericValueDecode for Fixed32Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Fixed32Encoder(U32leEncoder);
@@ -220,7 +220,7 @@ impl Fixed32Encoder {
 }
 impl_newtype_encode!(Fixed32Encoder, u32, Bit32);
 impl MapKeyEncode for Fixed32Encoder {}
-impl NumericEncode for Fixed32Encoder {}
+impl NumericValueEncode for Fixed32Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Fixed64Decoder(U64leDecoder);
@@ -231,7 +231,7 @@ impl Fixed64Decoder {
 }
 impl_newtype_decode!(Fixed64Decoder, u64, Bit64);
 impl MapKeyDecode for Fixed64Decoder {}
-impl NumericDecode for Fixed64Decoder {}
+impl NumericValueDecode for Fixed64Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Fixed64Encoder(U64leEncoder);
@@ -242,7 +242,7 @@ impl Fixed64Encoder {
 }
 impl_newtype_encode!(Fixed64Encoder, u64, Bit64);
 impl MapKeyEncode for Fixed64Encoder {}
-impl NumericEncode for Fixed64Encoder {}
+impl NumericValueEncode for Fixed64Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Sfixed32Decoder(I32leDecoder);
@@ -253,7 +253,7 @@ impl Sfixed32Decoder {
 }
 impl_newtype_decode!(Sfixed32Decoder, i32, Bit32);
 impl MapKeyDecode for Sfixed32Decoder {}
-impl NumericDecode for Sfixed32Decoder {}
+impl NumericValueDecode for Sfixed32Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Sfixed32Encoder(I32leEncoder);
@@ -264,7 +264,7 @@ impl Sfixed32Encoder {
 }
 impl_newtype_encode!(Sfixed32Encoder, i32, Bit32);
 impl MapKeyEncode for Sfixed32Encoder {}
-impl NumericEncode for Sfixed32Encoder {}
+impl NumericValueEncode for Sfixed32Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Sfixed64Decoder(I64leDecoder);
@@ -275,7 +275,7 @@ impl Sfixed64Decoder {
 }
 impl_newtype_decode!(Sfixed64Decoder, i64, Bit64);
 impl MapKeyDecode for Sfixed64Decoder {}
-impl NumericDecode for Sfixed64Decoder {}
+impl NumericValueDecode for Sfixed64Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Sfixed64Encoder(I64leEncoder);
@@ -286,7 +286,7 @@ impl Sfixed64Encoder {
 }
 impl_newtype_encode!(Sfixed64Encoder, i64, Bit64);
 impl MapKeyEncode for Sfixed64Encoder {}
-impl NumericEncode for Sfixed64Encoder {}
+impl NumericValueEncode for Sfixed64Encoder {}
 
 #[derive(Debug, Default)]
 pub struct BoolDecoder(VarintDecoder);
@@ -301,7 +301,7 @@ impl BoolDecoder {
 }
 impl_varint_decode!(BoolDecoder, bool);
 impl MapKeyDecode for BoolDecoder {}
-impl NumericDecode for BoolDecoder {}
+impl NumericValueDecode for BoolDecoder {}
 
 #[derive(Debug, Default)]
 pub struct BoolEncoder(VarintEncoder);
@@ -316,7 +316,7 @@ impl BoolEncoder {
 }
 impl_varint_encode!(BoolEncoder, bool);
 impl MapKeyEncode for BoolEncoder {}
-impl NumericEncode for BoolEncoder {}
+impl NumericValueEncode for BoolEncoder {}
 
 #[derive(Debug, Default)]
 pub struct Int32Decoder(VarintDecoder);
@@ -331,7 +331,7 @@ impl Int32Decoder {
 }
 impl_varint_decode!(Int32Decoder, i32);
 impl MapKeyDecode for Int32Decoder {}
-impl NumericDecode for Int32Decoder {}
+impl NumericValueDecode for Int32Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Int32Encoder(VarintEncoder);
@@ -346,7 +346,7 @@ impl Int32Encoder {
 }
 impl_varint_encode!(Int32Encoder, i32);
 impl MapKeyEncode for Int32Encoder {}
-impl NumericEncode for Int32Encoder {}
+impl NumericValueEncode for Int32Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Int64Decoder(VarintDecoder);
@@ -361,7 +361,7 @@ impl Int64Decoder {
 }
 impl_varint_decode!(Int64Decoder, i64);
 impl MapKeyDecode for Int64Decoder {}
-impl NumericDecode for Int64Decoder {}
+impl NumericValueDecode for Int64Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Int64Encoder(VarintEncoder);
@@ -376,7 +376,7 @@ impl Int64Encoder {
 }
 impl_varint_encode!(Int64Encoder, i64);
 impl MapKeyEncode for Int64Encoder {}
-impl NumericEncode for Int64Encoder {}
+impl NumericValueEncode for Int64Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Uint32Decoder(VarintDecoder);
@@ -391,7 +391,7 @@ impl Uint32Decoder {
 }
 impl_varint_decode!(Uint32Decoder, u32);
 impl MapKeyDecode for Uint32Decoder {}
-impl NumericDecode for Uint32Decoder {}
+impl NumericValueDecode for Uint32Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Uint32Encoder(VarintEncoder);
@@ -406,7 +406,7 @@ impl Uint32Encoder {
 }
 impl_varint_encode!(Uint32Encoder, u32);
 impl MapKeyEncode for Uint32Encoder {}
-impl NumericEncode for Uint32Encoder {}
+impl NumericValueEncode for Uint32Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Uint64Decoder(VarintDecoder);
@@ -421,7 +421,7 @@ impl Uint64Decoder {
 }
 impl_varint_decode!(Uint64Decoder, u64);
 impl MapKeyDecode for Uint64Decoder {}
-impl NumericDecode for Uint64Decoder {}
+impl NumericValueDecode for Uint64Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Uint64Encoder(VarintEncoder);
@@ -436,7 +436,7 @@ impl Uint64Encoder {
 }
 impl_varint_encode!(Uint64Encoder, u64);
 impl MapKeyEncode for Uint64Encoder {}
-impl NumericEncode for Uint64Encoder {}
+impl NumericValueEncode for Uint64Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Sint32Decoder(VarintDecoder);
@@ -452,7 +452,7 @@ impl Sint32Decoder {
 }
 impl_varint_decode!(Sint32Decoder, i32);
 impl MapKeyDecode for Sint32Decoder {}
-impl NumericDecode for Sint32Decoder {}
+impl NumericValueDecode for Sint32Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Sint32Encoder(VarintEncoder);
@@ -467,7 +467,7 @@ impl Sint32Encoder {
 }
 impl_varint_encode!(Sint32Encoder, i32);
 impl MapKeyEncode for Sint32Encoder {}
-impl NumericEncode for Sint32Encoder {}
+impl NumericValueEncode for Sint32Encoder {}
 
 #[derive(Debug, Default)]
 pub struct Sint64Decoder(VarintDecoder);
@@ -483,7 +483,7 @@ impl Sint64Decoder {
 }
 impl_varint_decode!(Sint64Decoder, i64);
 impl MapKeyDecode for Sint64Decoder {}
-impl NumericDecode for Sint64Decoder {}
+impl NumericValueDecode for Sint64Decoder {}
 
 #[derive(Debug, Default)]
 pub struct Sint64Encoder(VarintEncoder);
@@ -498,7 +498,7 @@ impl Sint64Encoder {
 }
 impl_varint_encode!(Sint64Encoder, i64);
 impl MapKeyEncode for Sint64Encoder {}
-impl NumericEncode for Sint64Encoder {}
+impl NumericValueEncode for Sint64Encoder {}
 
 #[derive(Debug, Default)]
 pub struct BytesDecoder(LengthDelimitedDecoder<RemainingBytesDecoder>);
