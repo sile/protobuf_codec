@@ -7,21 +7,6 @@ use bytecodec::combinator::{Buffered, Length};
 
 use tag::Tag;
 
-// WireValueDecode or FieldValueDecode
-pub trait WireDecode: Decode {
-    type Value: Default + From<Self::Item>;
-
-    fn wire_type(&self) -> WireType;
-    fn merge(&self, old: Self::Value, new: Self::Value) -> Self::Value; // TODO: name
-}
-
-pub trait WireEncode: Encode {
-    type Value;
-
-    fn wire_type(&self) -> WireType;
-    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()>;
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WireType {
     Varint = 0,
@@ -133,17 +118,6 @@ impl Decode for VarintDecoder {
         ByteCount::Unknown
     }
 }
-impl WireDecode for VarintDecoder {
-    type Value = u64;
-
-    fn wire_type(&self) -> WireType {
-        WireType::Varint
-    }
-
-    fn merge(&self, _old: Self::Value, new: Self::Item) -> Self::Value {
-        new
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct VarintEncoder(BytesEncoder<VarintBuf>);
@@ -189,18 +163,6 @@ impl ExactBytesEncode for VarintEncoder {
         self.0.exact_requiring_bytes()
     }
 }
-// TODO: delete
-// impl WireEncode for VarintEncoder {
-//     type Value = u64;
-
-//     fn wire_type(&self) -> WireType {
-//         WireType::Varint
-//     }
-
-//     fn is_default_value(&self, value: &Self::Value) -> bool {
-//         *value == 0
-//     }
-// }
 
 #[derive(Debug)]
 struct VarintBuf {
@@ -342,12 +304,6 @@ impl<E: ExactBytesEncode> ExactBytesEncode for LengthDelimitedEncoder<E> {
         self.len.exact_requiring_bytes() + self.inner.exact_requiring_bytes()
     }
 }
-// TOOD: delete
-// impl<E: ExactBytesEncode> WireEncode for LengthDelimitedEncoder<E> {
-//     fn wire_type(&self) -> WireType {
-//         WireType::LengthDelimited
-//     }
-// }
 
 #[cfg(test)]
 mod test {

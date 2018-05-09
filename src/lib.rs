@@ -4,11 +4,11 @@ extern crate bytecodec;
 extern crate trackable;
 
 pub mod field;
-pub mod message;
+// pub mod message;
 pub mod scalar;
 pub mod tag;
 pub mod wire;
 
-mod fields;
-mod oneof;
-mod repeated_field;
+// mod fields;
+// mod oneof;
+// mod repeated_field;

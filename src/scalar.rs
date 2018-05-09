@@ -8,16 +8,9 @@ use bytecodec::fixnum::{F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, 
                         I32leEncoder, I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder,
                         U64leDecoder, U64leEncoder};
 
-use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder,
-           WireDecode, WireEncode, WireType};
-
-pub trait MapKeyDecode: WireDecode {}
-
-pub trait MapKeyEncode: WireEncode {}
-
-pub trait NumericDecode: WireDecode {}
-
-pub trait NumericEncode: WireEncode {}
+use field::{MapKeyDecode, MapKeyEncode, NumericDecode, NumericEncode, OptionalValueDecode,
+            OptionalValueEncode, ValueDecode, ValueEncode};
+use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType};
 
 macro_rules! impl_newtype_decode {
     ($decoder:ty, $item:ty, $wire:ident) => {
@@ -32,14 +25,19 @@ macro_rules! impl_newtype_decode {
                 self.0.requiring_bytes()
             }
         }
-        impl WireDecode for $decoder {
-            type Value = $item;
-
+        impl ValueDecode for $decoder {
             fn wire_type(&self) -> WireType {
                 WireType::$wire
             }
 
-            fn merge(&self, _old: Self::Value, new: Self::Item) -> Self::Value {
+            fn merge_values(_old: Self::Item, new: Self::Item) -> Self::Item {
+                new
+            }
+        }
+        impl OptionalValueDecode for $decoder {
+            type Optional = $item;
+
+            fn merge_optional_values(_old: Self::Optional, new: Self::Optional) -> Self::Optional {
                 new
             }
         }
@@ -72,18 +70,16 @@ macro_rules! impl_newtype_encode {
                 self.0.exact_requiring_bytes()
             }
         }
-        impl WireEncode for $encoder {
-            type Value = $item;
-
+        impl ValueEncode for $encoder {
             fn wire_type(&self) -> WireType {
                 WireType::$wire
             }
+        }
+        impl OptionalValueEncode for $encoder {
+            type Optional = $item;
 
-            fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
-                if value != Default::default() {
-                    track!(self.start_encoding(value))?;
-                }
-                Ok(())
+            fn is_none_value(value: &Self::Optional) -> bool {
+                *value == Default::default()
             }
         }
     }
@@ -104,14 +100,19 @@ macro_rules! impl_varint_decode {
                 self.0.requiring_bytes()
             }
         }
-        impl WireDecode for $decoder {
-            type Value = $item;
-
+        impl ValueDecode for $decoder {
             fn wire_type(&self) -> WireType {
                 WireType::Varint
             }
 
-            fn merge(&self, _old: Self::Value, new: Self::Item) -> Self::Value {
+            fn merge_values(_old: Self::Item, new: Self::Item) -> Self::Item {
+                new
+            }
+        }
+        impl OptionalValueDecode for $decoder {
+            type Optional = $item;
+
+            fn merge_optional_values(_old: Self::Optional, new: Self::Optional) -> Self::Optional {
                 new
             }
         }
@@ -144,18 +145,16 @@ macro_rules! impl_varint_encode {
                 self.0.exact_requiring_bytes()
             }
         }
-        impl WireEncode for $encoder {
-            type Value = $item;
-
+        impl ValueEncode for $encoder {
             fn wire_type(&self) -> WireType {
                 WireType::Varint
             }
+        }
+        impl OptionalValueEncode for $encoder {
+            type Optional = $item;
 
-            fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
-                if value != Default::default() {
-                    track!(self.start_encoding(value))?;
-                }
-                Ok(())
+            fn is_none_value(value: &Self::Optional) -> bool {
+                *value == Default::default()
             }
         }
     }
@@ -510,7 +509,28 @@ impl BytesDecoder {
 }
 impl_newtype_decode!(BytesDecoder, Vec<u8>, LengthDelimited);
 
-// TODO: CustomBytesEncoder
+#[derive(Debug, Default)]
+pub struct CustomBytesDecoder<D>(LengthDelimitedDecoder<D>); // TODO: new
+impl<D: Decode> Decode for CustomBytesDecoder<D> {
+    type Item = D::Item;
+
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+        track!(self.0.decode(buf, eos))
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.0.requiring_bytes()
+    }
+}
+impl<D: Decode> ValueDecode for CustomBytesDecoder<D> {
+    fn wire_type(&self) -> WireType {
+        WireType::LengthDelimited
+    }
+
+    fn merge_values(_old: Self::Item, new: Self::Item) -> Self::Item {
+        new
+    }
+}
 
 #[derive(Debug)]
 pub struct BytesEncoder<B = Vec<u8>>(LengthDelimitedEncoder<BytesEncoderInner<B>>);
@@ -548,18 +568,48 @@ impl<B: AsRef<[u8]>> ExactBytesEncode for BytesEncoder<B> {
         self.0.exact_requiring_bytes()
     }
 }
-impl<B: AsRef<[u8]>> WireEncode for BytesEncoder<B> {
-    type Value = B;
-
+impl<B: AsRef<[u8]>> ValueEncode for BytesEncoder<B> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
+}
+impl<B: AsRef<[u8]>> OptionalValueEncode for BytesEncoder<B> {
+    type Optional = B;
 
-    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
-        if !value.as_ref().is_empty() {
-            track!(self.start_encoding(value))?;
-        }
-        Ok(())
+    fn is_none_value(value: &Self::Optional) -> bool {
+        value.as_ref().is_empty()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CustomBytesEncoder<E>(LengthDelimitedEncoder<E>); // TODO: new
+impl<E: ExactBytesEncode> Encode for CustomBytesEncoder<E> {
+    type Item = E::Item;
+
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        track!(self.0.encode(buf, eos))
+    }
+
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track!(self.0.start_encoding(item))
+    }
+
+    fn is_idle(&self) -> bool {
+        self.0.is_idle()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.0.requiring_bytes()
+    }
+}
+impl<E: ExactBytesEncode> ExactBytesEncode for CustomBytesEncoder<E> {
+    fn exact_requiring_bytes(&self) -> u64 {
+        self.0.exact_requiring_bytes()
+    }
+}
+impl<E: ExactBytesEncode> ValueEncode for CustomBytesEncoder<E> {
+    fn wire_type(&self) -> WireType {
+        WireType::LengthDelimited
     }
 }
 
@@ -609,18 +659,16 @@ impl<S: AsRef<str>> ExactBytesEncode for StringEncoder<S> {
         self.0.exact_requiring_bytes()
     }
 }
-impl<S: AsRef<str>> WireEncode for StringEncoder<S> {
-    type Value = S;
-
+impl<S: AsRef<str>> ValueEncode for StringEncoder<S> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
+}
+impl<S: AsRef<str>> OptionalValueEncode for StringEncoder<S> {
+    type Optional = S;
 
-    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
-        if !value.as_ref().is_empty() {
-            track!(self.start_encoding(value))?;
-        }
-        Ok(())
+    fn is_none_value(value: &Self::Optional) -> bool {
+        value.as_ref().is_empty()
     }
 }
 impl<S: AsRef<str>> MapKeyEncode for StringEncoder<S> {}
