@@ -5,10 +5,10 @@ use tag::Tag;
 use wire::WireType;
 
 #[derive(Debug, Default)]
-pub struct FieldsDecoder<F> {
+pub struct Fields<F> {
     fields: F,
 }
-impl<F0, F1> FieldDecode for FieldsDecoder<(F0, F1)>
+impl<F0, F1> FieldDecode for Fields<(F0, F1)>
 where
     F0: FieldDecode,
     F1: FieldDecode,
@@ -55,18 +55,12 @@ where
         }
     }
 
-    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
-        let v0 = self.fields.0.merge(old.0, new.0);
-        let v1 = self.fields.1.merge(old.1, new.1);
-        (v0, v1)
+    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
+        F0::merge_fields(&mut old.0, new.0);
+        F1::merge_fields(&mut old.1, new.1);
     }
 }
-
-#[derive(Debug, Default)]
-pub struct FieldsEncoder<F> {
-    fields: F,
-}
-impl<F0, F1> Encode for FieldsEncoder<(F0, F1)>
+impl<F0, F1> Encode for Fields<(F0, F1)>
 where
     F0: FieldEncode,
     F1: FieldEncode,
@@ -97,7 +91,7 @@ where
             .add_for_encoding(self.fields.1.requiring_bytes())
     }
 }
-impl<F0, F1> ExactBytesEncode for FieldsEncoder<(F0, F1)>
+impl<F0, F1> ExactBytesEncode for Fields<(F0, F1)>
 where
     F0: FieldEncode + ExactBytesEncode,
     F1: FieldEncode + ExactBytesEncode,
@@ -106,7 +100,7 @@ where
         self.fields.0.exact_requiring_bytes() + self.fields.1.exact_requiring_bytes()
     }
 }
-impl<F0, F1> FieldEncode for FieldsEncoder<(F0, F1)>
+impl<F0, F1> FieldEncode for Fields<(F0, F1)>
 where
     F0: FieldEncode,
     F1: FieldEncode,

@@ -238,17 +238,6 @@ impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
             .add_for_decoding(self.inner.requiring_bytes())
     }
 }
-// impl<D: Decode> WireDecode for LengthDelimitedDecoder<D> {
-//     type Value = D::Item;
-
-//     fn wire_type(&self) -> WireType {
-//         WireType::LengthDelimited
-//     }
-
-//     fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
-//         new
-//     }
-// }
 
 #[derive(Debug, Default)]
 pub struct LengthDelimitedEncoder<E> {

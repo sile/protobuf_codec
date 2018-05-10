@@ -1,15 +1,15 @@
-use bytecodec::{Decode, Encode};
+use bytecodec::{Decode, Encode, ExactBytesEncode, Result};
 
 use wire::WireType;
 
 pub trait ValueDecode: Decode {
     fn wire_type(&self) -> WireType;
-    fn merge_values(old: Self::Item, new: Self::Item) -> Self::Item;
+    fn merge_values(old: &mut Self::Item, new: Self::Item);
 }
 
 pub trait OptionalValueDecode: ValueDecode {
-    type Optional: Default;
-    fn merge_optional_values(old: Self::Optional, new: Self::Optional) -> Self::Optional;
+    type Optional: Default + From<Self::Item>;
+    fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional);
 }
 
 pub trait ValueEncode: Encode {
@@ -18,7 +18,7 @@ pub trait ValueEncode: Encode {
 
 pub trait OptionalValueEncode: ValueEncode {
     type Optional;
-    fn is_none_value(value: &Self::Optional) -> bool;
+    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()>;
 }
 
 pub trait MapKeyDecode: ValueDecode {}
@@ -27,4 +27,4 @@ pub trait MapKeyEncode: ValueEncode {}
 
 pub trait NumericValueDecode: ValueDecode {}
 
-pub trait NumericValueEncode: ValueEncode {}
+pub trait NumericValueEncode: ValueEncode + ExactBytesEncode {}

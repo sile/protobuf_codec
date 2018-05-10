@@ -2,11 +2,11 @@ use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
 use bytecodec::combinator::PreEncode;
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
-use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder, WireDecode,
-           WireEncode, WireType};
+use value::{OptionalValueDecode, ValueDecode, ValueEncode};
+use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder, WireType};
 
 pub trait MessageDecode: Decode {
-    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item;
+    fn merge_messages(old: &mut Self::Item, new: Self::Item);
 }
 
 pub trait MessageEncode: Encode {}
@@ -73,8 +73,8 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     }
 }
 impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {
-    fn merge(&self, old: Self::Item, new: Self::Item) -> Self::Item {
-        self.field.merge(old, new)
+    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
+        F::merge_fields(old, new)
     }
 }
 
@@ -91,19 +91,30 @@ impl<M: MessageDecode> Decode for EmbeddedMessageDecoder<M> {
         self.0.requiring_bytes()
     }
 }
-impl<M: MessageDecode> WireDecode for EmbeddedMessageDecoder<M> {
-    type Value = Option<M::Item>;
-
+impl<M: MessageDecode> ValueDecode for EmbeddedMessageDecoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
 
-    fn merge(&self, old: Self::Value, new: Self::Value) -> Self::Value {
-        match (old, new) {
-            (None, None) => None,
-            (Some(old), None) => Some(old),
-            (None, Some(new)) => Some(new),
-            (Some(old), Some(new)) => Some(self.0.inner_ref().merge(old, new)),
+    fn merge_values(old: &mut Self::Item, new: Self::Item) {
+        M::merge_messages(old, new);
+    }
+}
+impl<M: MessageDecode> OptionalValueDecode for EmbeddedMessageDecoder<M> {
+    type Optional = Option<M::Item>;
+
+    fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional) {
+        match (old.take(), new) {
+            (None, new) => {
+                *old = new;
+            }
+            (Some(v), None) => {
+                *old = Some(v);
+            }
+            (Some(mut v), Some(new)) => {
+                Self::merge_values(&mut v, new);
+                *old = Some(v);
+            }
         }
     }
 }
@@ -180,17 +191,8 @@ impl<M: MessageEncode + ExactBytesEncode> ExactBytesEncode for EmbeddedMessageEn
         self.message.exact_requiring_bytes()
     }
 }
-impl<M: MessageEncode + ExactBytesEncode> WireEncode for EmbeddedMessageEncoder<M> {
-    type Value = Option<M::Item>;
-
+impl<M: MessageEncode + ExactBytesEncode> ValueEncode for EmbeddedMessageEncoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
-    }
-
-    fn start_encoding_value(&mut self, value: Self::Value) -> Result<()> {
-        if let Some(item) = value {
-            track!(self.start_encoding(item))?;
-        }
-        Ok(())
     }
 }

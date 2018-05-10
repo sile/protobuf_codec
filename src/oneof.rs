@@ -1,8 +1,10 @@
 use bytecodec::{ByteCount, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 
-use field::{FieldDecode, FieldEncode, SingularFieldDecode, SingularFieldEncode};
+use field::{FieldDecode, FieldEncode, OneOfFieldDecode, OneOfFieldEncode};
 use tag::Tag;
 use wire::WireType;
+
+// TODO: OneOf1
 
 #[derive(Debug)]
 pub enum OneOf2<A, B> {
@@ -110,22 +112,29 @@ impl<A, B, C, D, E, F, G, H> Default for OneOf8<A, B, C, D, E, F, G, H> {
 }
 
 #[derive(Debug, Default)]
-pub struct OneOfDecoder<D> {
-    decoders: D,
+pub struct OneOf<F> {
+    fields: F,
     index: usize,
 }
-impl<D0, D1> FieldDecode for OneOfDecoder<(D0, D1)>
+impl<F0, F1> FieldDecode for OneOf<(F0, F1)>
 where
-    D0: SingularFieldDecode,
-    D1: SingularFieldDecode,
+    F0: OneOfFieldDecode,
+    F1: OneOfFieldDecode,
 {
-    type Item = OneOf2<D0::Item, D1::Item>;
+    type Item = OneOf2<F0::Item, F1::Item>;
 
     fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
-        if track!(self.decoders.0.start_decoding(tag, wire_type))? {
+        match self.index {
+            0 => {}
+            1 => track!(self.fields.0.finish_decoding()).map(|_| ())?,
+            2 => track!(self.fields.1.finish_decoding()).map(|_| ())?,
+            _ => unreachable!(),
+        }
+
+        if track!(self.fields.0.start_decoding(tag, wire_type))? {
             self.index = 1;
             Ok(true)
-        } else if track!(self.decoders.1.start_decoding(tag, wire_type))? {
+        } else if track!(self.fields.1.start_decoding(tag, wire_type))? {
             self.index = 2;
             Ok(true)
         } else {
@@ -134,77 +143,65 @@ where
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        if self.decoders.0.is_decoding() {
-            track!(self.decoders.0.field_decode(buf, eos))
-        } else if self.decoders.1.is_decoding() {
-            track!(self.decoders.1.field_decode(buf, eos))
-        } else {
-            Ok(0)
+        match self.index {
+            0 => Ok(0),
+            1 => track!(self.fields.0.field_decode(buf, eos)),
+            2 => track!(self.fields.1.field_decode(buf, eos)),
+            _ => unreachable!(),
         }
     }
 
     fn is_decoding(&self) -> bool {
-        self.decoders.0.is_decoding() || self.decoders.1.is_decoding()
+        match self.index {
+            0 => false,
+            1 => self.fields.0.is_decoding(),
+            2 => self.fields.1.is_decoding(),
+            _ => unreachable!(),
+        }
     }
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
-        let v0 = track!(self.decoders.0.finish_decoding())?; // TODO: return Option<_>
-        let v1 = track!(self.decoders.1.finish_decoding())?; // TODO: return Option<_>
         let i = self.index;
         self.index = 0;
         match i {
             0 => Ok(OneOf2::None),
-            1 => Ok(OneOf2::A(v0)),
-            2 => Ok(OneOf2::B(v1)),
+            1 => track!(self.fields.0.finish_decoding()).map(OneOf2::A),
+            2 => track!(self.fields.1.finish_decoding()).map(OneOf2::B),
             _ => unreachable!(),
         }
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        if self.decoders.0.is_decoding() {
-            self.decoders.0.requiring_bytes()
-        } else if self.decoders.1.is_decoding() {
-            self.decoders.1.requiring_bytes()
-        } else {
-            ByteCount::Unknown
+        match self.index {
+            0 => ByteCount::Unknown,
+            1 => self.fields.0.requiring_bytes(),
+            2 => self.fields.1.requiring_bytes(),
+            _ => unreachable!(),
         }
     }
 
-    fn merge(&self, _old: Self::Item, new: Self::Item) -> Self::Item {
-        // TODO
-        new
+    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
+        *old = new;
     }
 }
-
-#[derive(Debug, Default)]
-pub struct OneOfEncoder<E> {
-    encoders: E,
-    index: usize,
-}
-impl<E0, E1> Encode for OneOfEncoder<(E0, E1)>
+impl<F0, F1> OneOfFieldDecode for OneOf<(F0, F1)>
 where
-    E0: SingularFieldEncode,
-    E1: SingularFieldEncode,
+    F0: OneOfFieldDecode,
+    F1: OneOfFieldDecode,
 {
-    type Item = OneOf2<E0::Item, E1::Item>;
+}
+impl<F0, F1> Encode for OneOf<(F0, F1)>
+where
+    F0: OneOfFieldEncode,
+    F1: OneOfFieldEncode,
+{
+    type Item = OneOf2<F0::Item, F1::Item>;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         match self.index {
             0 => Ok(0),
-            1 => {
-                let size = track!(self.encoders.0.encode(buf, eos))?;
-                if self.encoders.0.is_idle() {
-                    self.index = 0;
-                }
-                Ok(size)
-            }
-            2 => {
-                let size = track!(self.encoders.1.encode(buf, eos))?;
-                if self.encoders.1.is_idle() {
-                    self.index = 0;
-                }
-                Ok(size)
-            }
+            1 => track!(self.fields.0.encode(buf, eos)),
+            2 => track!(self.fields.1.encode(buf, eos)),
             _ => unreachable!(),
         }
     }
@@ -214,46 +211,57 @@ where
         match item {
             OneOf2::A(v) => {
                 self.index = 1;
-                track!(self.encoders.0.start_encoding(v))
+                track!(self.fields.0.start_encoding(v))
             }
             OneOf2::B(v) => {
                 self.index = 2;
-                track!(self.encoders.1.start_encoding(v))
+                track!(self.fields.1.start_encoding(v))
             }
             OneOf2::None => Ok(()),
         }
     }
 
     fn is_idle(&self) -> bool {
-        self.index == 0
+        match self.index {
+            0 => true,
+            1 => self.fields.0.is_idle(),
+            2 => self.fields.1.is_idle(),
+            _ => unreachable!(),
+        }
     }
 
     fn requiring_bytes(&self) -> ByteCount {
         match self.index {
             0 => ByteCount::Finite(0),
-            1 => self.encoders.0.requiring_bytes(),
-            2 => self.encoders.1.requiring_bytes(),
+            1 => self.fields.0.requiring_bytes(),
+            2 => self.fields.1.requiring_bytes(),
             _ => unreachable!(),
         }
     }
 }
-impl<E0, E1> ExactBytesEncode for OneOfEncoder<(E0, E1)>
+impl<F0, F1> FieldEncode for OneOf<(F0, F1)>
 where
-    E0: SingularFieldEncode + ExactBytesEncode,
-    E1: SingularFieldEncode + ExactBytesEncode,
+    F0: OneOfFieldEncode,
+    F1: OneOfFieldEncode,
+{
+}
+impl<F0, F1> OneOfFieldEncode for OneOf<(F0, F1)>
+where
+    F0: OneOfFieldEncode,
+    F1: OneOfFieldEncode,
+{
+}
+impl<F0, F1> ExactBytesEncode for OneOf<(F0, F1)>
+where
+    F0: OneOfFieldEncode + ExactBytesEncode,
+    F1: OneOfFieldEncode + ExactBytesEncode,
 {
     fn exact_requiring_bytes(&self) -> u64 {
         match self.index {
             0 => 0,
-            1 => self.encoders.0.exact_requiring_bytes(),
-            2 => self.encoders.1.exact_requiring_bytes(),
+            1 => self.fields.0.exact_requiring_bytes(),
+            2 => self.fields.1.exact_requiring_bytes(),
             _ => unreachable!(),
         }
     }
-}
-impl<E0, E1> FieldEncode for OneOfEncoder<(E0, E1)>
-where
-    E0: SingularFieldEncode,
-    E1: SingularFieldEncode,
-{
 }

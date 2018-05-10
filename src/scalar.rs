@@ -30,15 +30,15 @@ macro_rules! impl_newtype_decode {
                 WireType::$wire
             }
 
-            fn merge_values(_old: Self::Item, new: Self::Item) -> Self::Item {
-                new
+            fn merge_values(old: &mut Self::Item, new: Self::Item) {
+                *old = new;
             }
         }
         impl OptionalValueDecode for $decoder {
             type Optional = $item;
 
-            fn merge_optional_values(_old: Self::Optional, new: Self::Optional) -> Self::Optional {
-                new
+            fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional) {
+                *old = new;
             }
         }
     }
@@ -78,8 +78,11 @@ macro_rules! impl_newtype_encode {
         impl OptionalValueEncode for $encoder {
             type Optional = $item;
 
-            fn is_none_value(value: &Self::Optional) -> bool {
-                *value == Default::default()
+            fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
+                if item != Default::default() {
+                    track!(self.start_encoding(item))?;
+                }
+                Ok(())
             }
         }
     }
@@ -105,15 +108,15 @@ macro_rules! impl_varint_decode {
                 WireType::Varint
             }
 
-            fn merge_values(_old: Self::Item, new: Self::Item) -> Self::Item {
-                new
+            fn merge_values(old: &mut Self::Item, new: Self::Item) {
+                *old = new;
             }
         }
         impl OptionalValueDecode for $decoder {
             type Optional = $item;
 
-            fn merge_optional_values(_old: Self::Optional, new: Self::Optional) -> Self::Optional {
-                new
+            fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional) {
+                *old = new;
             }
         }
     }
@@ -153,8 +156,11 @@ macro_rules! impl_varint_encode {
         impl OptionalValueEncode for $encoder {
             type Optional = $item;
 
-            fn is_none_value(value: &Self::Optional) -> bool {
-                *value == Default::default()
+            fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
+                if item != Default::default() {
+                    track!(self.start_encoding(item))?;
+                }
+                Ok(())
             }
         }
     }
@@ -527,8 +533,8 @@ impl<D: Decode> ValueDecode for CustomBytesDecoder<D> {
         WireType::LengthDelimited
     }
 
-    fn merge_values(_old: Self::Item, new: Self::Item) -> Self::Item {
-        new
+    fn merge_values(old: &mut Self::Item, new: Self::Item) {
+        *old = new;
     }
 }
 
@@ -576,8 +582,11 @@ impl<B: AsRef<[u8]>> ValueEncode for BytesEncoder<B> {
 impl<B: AsRef<[u8]>> OptionalValueEncode for BytesEncoder<B> {
     type Optional = B;
 
-    fn is_none_value(value: &Self::Optional) -> bool {
-        value.as_ref().is_empty()
+    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
+        if !item.as_ref().is_empty() {
+            track!(self.start_encoding(item))?;
+        }
+        Ok(())
     }
 }
 
@@ -667,8 +676,11 @@ impl<S: AsRef<str>> ValueEncode for StringEncoder<S> {
 impl<S: AsRef<str>> OptionalValueEncode for StringEncoder<S> {
     type Optional = S;
 
-    fn is_none_value(value: &Self::Optional) -> bool {
-        value.as_ref().is_empty()
+    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
+        if !item.as_ref().is_empty() {
+            track!(self.start_encoding(item))?;
+        }
+        Ok(())
     }
 }
 impl<S: AsRef<str>> MapKeyEncode for StringEncoder<S> {}
