@@ -5,7 +5,7 @@ use bytecodec::combinator::SkipRemaining;
 use bytecodec::value::NullDecoder;
 
 pub use fields::Fields;
-pub use oneof::{OneOf, OneOf2, OneOf3, OneOf4, OneOf5, OneOf6, OneOf7, OneOf8};
+pub use oneof::{OneOf, OneOf1, OneOf2, OneOf3, OneOf4, OneOf5, OneOf6, OneOf7, OneOf8};
 pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, PackedRepeatedFieldDecoder,
                          PackedRepeatedFieldEncoder, RepeatedFieldDecoder, RepeatedFieldEncoder,
                          RepeatedNumericFieldDecoder};

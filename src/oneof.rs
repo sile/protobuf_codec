@@ -4,7 +4,16 @@ use field::{FieldDecode, FieldEncode, OneOfFieldDecode, OneOfFieldEncode};
 use tag::Tag;
 use wire::WireType;
 
-// TODO: OneOf1
+#[derive(Debug)]
+pub enum OneOf1<A> {
+    A(A),
+    None,
+}
+impl<A> Default for OneOf1<A> {
+    fn default() -> Self {
+        OneOf1::None
+    }
+}
 
 #[derive(Debug)]
 pub enum OneOf2<A, B> {
@@ -111,85 +120,97 @@ impl<A, B, C, D, E, F, G, H> Default for OneOf8<A, B, C, D, E, F, G, H> {
     }
 }
 
+macro_rules! impl_field_decode {
+    ($oneof:ident, [$($f:ident),*], [$($i:expr),*], [$($j:tt),*]) => {
+        impl<$($f),*> FieldDecode for OneOf<($($f),*,)>
+        where
+            $($f: OneOfFieldDecode),*
+        {
+            type Item = $oneof<$($f::Item),*>;
+
+            fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
+                match self.index {
+                    $($i => track!(self.fields.$j.finish_decoding()).map(|_| ())?),*,
+                    _ => {},
+                }
+
+                $(if track!(self.fields.$j.start_decoding(tag, wire_type))? {
+                    self.index = $i;
+                    return Ok(true);
+                })*
+                Ok(false)
+            }
+
+            fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+                match self.index {
+                    $($i => track!(self.fields.$j.field_decode(buf, eos))),*,
+                    _ => Ok(0),
+                }
+            }
+
+            fn is_decoding(&self) -> bool {
+                match self.index {
+                    $($i => self.fields.$j.is_decoding()),*,
+                    _ => false,
+                }
+            }
+
+            fn finish_decoding(&mut self) -> Result<Self::Item> {
+                let i = self.index;
+                self.index = 0;
+                match i {
+                    $($i => track!(self.fields.$j.finish_decoding()).map($oneof::$f)),*,
+                    _ => Ok($oneof::None),
+                }
+            }
+
+            fn requiring_bytes(&self) -> ByteCount {
+                match self.index {
+                    $($i => self.fields.$j.requiring_bytes()),*,
+                    _ => ByteCount::Unknown,
+                }
+            }
+
+            fn merge_fields(old: &mut Self::Item, new: Self::Item) {
+                *old = new;
+            }
+        }
+        impl<$($f),*> OneOfFieldDecode for OneOf<($($f),*,)>
+        where
+            $($f: OneOfFieldDecode),*
+        {
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct OneOf<F> {
     fields: F,
     index: usize,
 }
-impl<F0, F1> FieldDecode for OneOf<(F0, F1)>
-where
-    F0: OneOfFieldDecode,
-    F1: OneOfFieldDecode,
-{
-    type Item = OneOf2<F0::Item, F1::Item>;
-
-    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
-        match self.index {
-            0 => {}
-            1 => track!(self.fields.0.finish_decoding()).map(|_| ())?,
-            2 => track!(self.fields.1.finish_decoding()).map(|_| ())?,
-            _ => unreachable!(),
-        }
-
-        if track!(self.fields.0.start_decoding(tag, wire_type))? {
-            self.index = 1;
-            Ok(true)
-        } else if track!(self.fields.1.start_decoding(tag, wire_type))? {
-            self.index = 2;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        match self.index {
-            0 => Ok(0),
-            1 => track!(self.fields.0.field_decode(buf, eos)),
-            2 => track!(self.fields.1.field_decode(buf, eos)),
-            _ => unreachable!(),
-        }
-    }
-
-    fn is_decoding(&self) -> bool {
-        match self.index {
-            0 => false,
-            1 => self.fields.0.is_decoding(),
-            2 => self.fields.1.is_decoding(),
-            _ => unreachable!(),
-        }
-    }
-
-    fn finish_decoding(&mut self) -> Result<Self::Item> {
-        let i = self.index;
-        self.index = 0;
-        match i {
-            0 => Ok(OneOf2::None),
-            1 => track!(self.fields.0.finish_decoding()).map(OneOf2::A),
-            2 => track!(self.fields.1.finish_decoding()).map(OneOf2::B),
-            _ => unreachable!(),
-        }
-    }
-
-    fn requiring_bytes(&self) -> ByteCount {
-        match self.index {
-            0 => ByteCount::Unknown,
-            1 => self.fields.0.requiring_bytes(),
-            2 => self.fields.1.requiring_bytes(),
-            _ => unreachable!(),
-        }
-    }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        *old = new;
-    }
-}
-impl<F0, F1> OneOfFieldDecode for OneOf<(F0, F1)>
-where
-    F0: OneOfFieldDecode,
-    F1: OneOfFieldDecode,
-{
-}
+impl_field_decode!(OneOf1, [A], [1], [0]);
+impl_field_decode!(OneOf2, [A, B], [1, 2], [0, 1]);
+impl_field_decode!(OneOf3, [A, B, C], [1, 2, 3], [0, 1, 2]);
+impl_field_decode!(OneOf4, [A, B, C, D], [1, 2, 3, 4], [0, 1, 2, 3]);
+impl_field_decode!(OneOf5, [A, B, C, D, E], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4]);
+impl_field_decode!(
+    OneOf6,
+    [A, B, C, D, E, F],
+    [1, 2, 3, 4, 5, 6],
+    [0, 1, 2, 3, 4, 5]
+);
+impl_field_decode!(
+    OneOf7,
+    [A, B, C, D, E, F, G],
+    [1, 2, 3, 4, 5, 6, 7],
+    [0, 1, 2, 3, 4, 5, 6]
+);
+impl_field_decode!(
+    OneOf8,
+    [A, B, C, D, E, F, G, H],
+    [1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7]
+);
 impl<F0, F1> Encode for OneOf<(F0, F1)>
 where
     F0: OneOfFieldEncode,

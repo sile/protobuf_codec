@@ -164,7 +164,6 @@ where
 
         let (size, item) = track!(self.decoder.decode(buf, eos); self.tag.into())?;
         if let Some(values) = item {
-            // TODO: optimize (add Collect::set_item)
             self.values.extend(values.into_iter());
             self.is_decoding = false;
         }
@@ -202,7 +201,7 @@ where
 {
     decoder: D,
     packed_decoder: PackedRepeatedFieldDecoder<T, V, D>,
-    is_decoding: bool, // TODO: remove
+    is_decoding: bool, // TODO: rename
 }
 impl<T, V, D> FieldDecode for RepeatedNumericFieldDecoder<T, V, D>
 where
