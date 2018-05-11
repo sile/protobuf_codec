@@ -1,51 +1,93 @@
-use std::fmt;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+//! Encoders and decoders and related components for message fields.
 use bytecodec::bytes::CopyableBytesDecoder;
 use bytecodec::combinator::SkipRemaining;
 use bytecodec::value::NullDecoder;
+use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use std::fmt;
 
 pub use fields::Fields;
-pub use oneof::{OneOf, OneOf1, OneOf2, OneOf3, OneOf4, OneOf5, OneOf6, OneOf7, OneOf8};
+pub use oneof::{Oneof, Oneof1, Oneof2, Oneof3, Oneof4, Oneof5, Oneof6, Oneof7, Oneof8};
 pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, PackedRepeatedFieldDecoder,
                          PackedRepeatedFieldEncoder, RepeatedFieldDecoder, RepeatedFieldEncoder,
                          RepeatedNumericFieldDecoder};
 
-use tag::Tag;
 use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder};
+use tag::Tag;
 use value::{OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
 use wire::{LengthDelimitedDecoder, TagAndTypeEncoder, VarintDecoder, WireType};
 
+/// Decoder for fields that have embedded messages as the value.
 pub type MessageFieldDecoder<T, D> = FieldDecoder<T, EmbeddedMessageDecoder<D>>;
+
+/// Decoder for repeated fields that have embedded messages as the value.
 pub type RepeatedMessageFieldDecoder<T, V, E> =
     RepeatedFieldDecoder<T, V, EmbeddedMessageDecoder<E>>;
 
+/// Encoder for fields that have embedded messages as the value.
 pub type MessageFieldEncoder<T, E> = FieldEncoder<T, EmbeddedMessageEncoder<E>>;
+
+/// Encoder for repeated fields that have embedded messages as the value.
 pub type RepeatedMessageFieldEncoder<T, V, E> =
     RepeatedFieldEncoder<T, V, EmbeddedMessageEncoder<E>>;
 
+/// This trait allows for decoding message fields.
 pub trait FieldDecode {
+    /// The type of the decoded items (i.e., field values).
     type Item;
 
+    /// Tries to start decoding a field.
+    ///
+    /// If `tag` is not a target of the decoder, `Ok(false)` will be returned.
     fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool>;
+
+    /// Decodes the given bytes.
+    ///
+    /// This is equivalent to `Decode::decode` method except
+    /// this does not return the decoded items as the result value of the method.
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize>;
+
+    /// Returns `true` if the decoder is in the middle of decoding an item, otherwise `false`.
     fn is_decoding(&self) -> bool;
+
+    /// Takes the item decoded by the decoder.
+    ///
+    /// Some implementation may returns the default value if the field is missing.
     fn finish_decoding(&mut self) -> Result<Self::Item>;
+
+    /// Returns the lower bound of the number of bytes needed to decode the next item.
     fn requiring_bytes(&self) -> ByteCount;
+
+    /// Merges duplicate field values.
     fn merge_fields(old: &mut Self::Item, new: Self::Item);
 }
 
-pub trait OneOfFieldDecode: FieldDecode {}
+/// This trait allows for decoding `Oneof` fields.
+pub trait OneofFieldDecode: FieldDecode {}
 
+/// This trait allows for encoding message fields.
 pub trait FieldEncode: Encode {}
 
-pub trait OneOfFieldEncode: FieldEncode {}
+/// This trait allows for encoding `Oneof` fields.
+pub trait OneofFieldEncode: FieldEncode {}
 
+/// Decoder for required fields.
 #[derive(Debug)]
 pub struct FieldDecoder<T, D: ValueDecode> {
     tag: T,
     decoder: D,
     value: Option<D::Item>,
     is_decoding: bool,
+}
+impl<T, D: ValueDecode> FieldDecoder<T, D> {
+    /// Makes a new `FieldDecoder` instance.
+    pub fn new(tag: T, value_decoder: D) -> Self {
+        FieldDecoder {
+            tag,
+            decoder: value_decoder,
+            value: None,
+            is_decoding: false,
+        }
+    }
 }
 impl<T, D> FieldDecode for FieldDecoder<T, D>
 where
@@ -101,7 +143,7 @@ where
         D::merge_values(old, new)
     }
 }
-impl<T, D> OneOfFieldDecode for FieldDecoder<T, D>
+impl<T, D> OneofFieldDecode for FieldDecoder<T, D>
 where
     T: Copy + Into<Tag>,
     D: ValueDecode,
@@ -122,8 +164,15 @@ where
     }
 }
 
+/// Decoder for optional fields.
 #[derive(Default)]
 pub struct OptionalFieldDecoder<T, D: OptionalValueDecode>(FieldDecoder<T, D>);
+impl<T, D: OptionalValueDecode> OptionalFieldDecoder<T, D> {
+    /// Makes a new `OptionalFieldDecoder` instance.
+    pub fn new(tag: T, value_decoder: D) -> Self {
+        OptionalFieldDecoder(FieldDecoder::new(tag, value_decoder))
+    }
+}
 impl<T, D> FieldDecode for OptionalFieldDecoder<T, D>
 where
     T: Copy + Into<Tag>,
@@ -171,8 +220,17 @@ where
     }
 }
 
+/// Decoder for unknown fields.
+///
+/// This accepts any tags but the decoded values will be discarded.
 #[derive(Debug)]
 pub struct UnknownFieldDecoder(UnknownFieldDecoderInner);
+impl UnknownFieldDecoder {
+    /// Makes a new `UnknownFieldDecoder` instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 impl FieldDecode for UnknownFieldDecoder {
     type Item = ();
 
@@ -250,8 +308,15 @@ enum UnknownFieldDecoderInner {
     LengthDelimited(LengthDelimitedDecoder<SkipRemaining<NullDecoder>>),
 }
 
+/// Encoder for optional fields.
 #[derive(Debug, Default)]
 pub struct OptionalFieldEncoder<T, E>(FieldEncoder<T, E>);
+impl<T, E: OptionalValueEncode> OptionalFieldEncoder<T, E> {
+    /// Makes a new `OptionalFieldEncoder` instance.
+    pub fn new(tag: T, value_encoder: E) -> Self {
+        OptionalFieldEncoder(FieldEncoder::new(tag, value_encoder))
+    }
+}
 impl<T, E> Encode for OptionalFieldEncoder<T, E>
 where
     T: Copy + Into<Tag>,
@@ -296,6 +361,7 @@ where
 {
 }
 
+/// Encoder for required fields.
 #[derive(Debug, Default)]
 pub struct FieldEncoder<T, E> {
     tag: T,
@@ -304,9 +370,9 @@ pub struct FieldEncoder<T, E> {
 }
 impl<T, E> FieldEncoder<T, E>
 where
-    T: Copy + Into<Tag>,
     E: ValueEncode,
 {
+    /// Makes a new `FieldEncoder` instance.
     pub fn new(tag: T, value_encoder: E) -> Self {
         FieldEncoder {
             tag,
@@ -367,9 +433,9 @@ mod test {
     use bytecodec::EncodeExt;
     use bytecodec::io::IoEncodeExt;
 
+    use super::*;
     use scalar::Fixed32Encoder;
     use tag::Tag1;
-    use super::*;
 
     macro_rules! assert_encode {
         ($encoder:ty, $value:expr, $bytes:expr) => {
@@ -377,7 +443,7 @@ mod test {
             let mut encoder: $encoder = track_try_unwrap!(EncodeExt::with_item($value));
             track_try_unwrap!(encoder.encode_all(&mut buf));
             assert_eq!(buf, $bytes);
-        }
+        };
     }
 
     #[test]

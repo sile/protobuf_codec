@@ -1,13 +1,23 @@
 //! Encoders and decoders and related components for values used in the [binary wire format].
 //!
+//! Since this a low-level module, developers usually do not use it directly.
+//!
 //! [binary wire format]: https://developers.google.com/protocol-buffers/docs/encoding
-use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use bytecodec::bytes::BytesEncoder;
 use bytecodec::combinator::{Buffered, Length};
+use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 
 use tag::Tag;
 
+/// Wire type.
+///
+/// `protobuf_codec` does not support deprecated types (i.e., "Start group" and "End group").
+///
+/// See [Message Structure] for information about each types.
+///
+/// [Message Structure]: https://developers.google.com/protocol-buffers/docs/encoding#structure
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum WireType {
     Varint = 0,
     Bit32 = 5,
@@ -15,9 +25,11 @@ pub enum WireType {
     LengthDelimited = 2,
 }
 
+/// Decoder for field tag and wire type.
 #[derive(Debug, Default)]
 pub struct TagAndTypeDecoder(VarintDecoder);
 impl TagAndTypeDecoder {
+    /// Makes a new `TagAndTypeDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -52,9 +64,11 @@ impl Decode for TagAndTypeDecoder {
     }
 }
 
+/// Encoder for field tag and wire type.
 #[derive(Debug, Default)]
 pub struct TagAndTypeEncoder(VarintEncoder);
 impl TagAndTypeEncoder {
+    /// Makes a new `TagAndTypeEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -85,12 +99,14 @@ impl ExactBytesEncode for TagAndTypeEncoder {
     }
 }
 
+/// Decoder for `Varint` values.
 #[derive(Debug, Default)]
 pub struct VarintDecoder {
     value: u64,
     index: usize,
 }
 impl VarintDecoder {
+    /// Makes a new `VarintDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -119,9 +135,11 @@ impl Decode for VarintDecoder {
     }
 }
 
+/// Encoder for `Varint` values.
 #[derive(Debug, Default)]
 pub struct VarintEncoder(BytesEncoder<VarintBuf>);
 impl VarintEncoder {
+    /// Makes a new `VarintEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -183,12 +201,14 @@ impl AsRef<[u8]> for VarintBuf {
     }
 }
 
+/// Decoder for `Length-delimited` values.
 #[derive(Debug, Default)]
 pub struct LengthDelimitedDecoder<D> {
     len: Buffered<VarintDecoder>,
     inner: Length<D>,
 }
 impl<D: Decode> LengthDelimitedDecoder<D> {
+    /// Makes a new `LengthDelimitedDecoder` instance.
     pub fn new(inner: D) -> Self {
         LengthDelimitedDecoder {
             len: Default::default(),
@@ -196,14 +216,17 @@ impl<D: Decode> LengthDelimitedDecoder<D> {
         }
     }
 
+    /// Returns a reference to the inner decoder.
     pub fn inner_ref(&self) -> &D {
         self.inner.inner_ref()
     }
 
+    /// Returns a mutable reference to the inner decoder.
     pub fn inner_mut(&mut self) -> &mut D {
         self.inner.inner_mut()
     }
 
+    /// Takes ownership of the instance and returns the inner decoder.
     pub fn into_inner(self) -> D {
         self.inner.into_inner()
     }
@@ -239,12 +262,14 @@ impl<D: Decode> Decode for LengthDelimitedDecoder<D> {
     }
 }
 
+/// Encoder for `Length-delimited` values.
 #[derive(Debug, Default)]
 pub struct LengthDelimitedEncoder<E> {
     len: VarintEncoder,
     inner: E,
 }
 impl<E: ExactBytesEncode> LengthDelimitedEncoder<E> {
+    /// Makes a new `LengthDelimitedEncoder` instance.
     pub fn new(inner: E) -> Self {
         LengthDelimitedEncoder {
             len: Default::default(),
@@ -252,14 +277,17 @@ impl<E: ExactBytesEncode> LengthDelimitedEncoder<E> {
         }
     }
 
+    /// Returns a reference to the inner encoder.
     pub fn inner_ref(&self) -> &E {
         &self.inner
     }
 
+    /// Returns a mutable reference to the inner encoder.
     pub fn inner_mut(&mut self) -> &mut E {
         &mut self.inner
     }
 
+    /// Takes ownership of the instance and returns the inner encoder.
     pub fn into_inner(self) -> E {
         self.inner
     }

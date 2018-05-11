@@ -1,8 +1,8 @@
+use bytecodec::combinator::Collect;
+use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 use std::fmt;
 use std::iter;
 use std::mem;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
-use bytecodec::combinator::Collect;
 
 use field::{FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, Fields,
             RepeatedMessageFieldDecoder, RepeatedMessageFieldEncoder};
@@ -13,12 +13,24 @@ use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, 
             ValueEncode};
 use wire::{LengthDelimitedDecoder, TagAndTypeEncoder, WireType};
 
+/// Decoder for repeated fields.
 #[derive(Debug, Default)]
 pub struct RepeatedFieldDecoder<T, V, D> {
     tag: T,
     decoder: D,
     values: V,
     is_decoding: bool,
+}
+impl<T, V: Default, D> RepeatedFieldDecoder<T, V, D> {
+    /// Makes a new `RepeatedFieldDecoder` instance.
+    pub fn new(tag: T, value_decoder: D) -> Self {
+        RepeatedFieldDecoder {
+            tag,
+            decoder: value_decoder,
+            values: V::default(),
+            is_decoding: false,
+        }
+    }
 }
 impl<T, V, D> FieldDecode for RepeatedFieldDecoder<T, V, D>
 where
@@ -66,10 +78,20 @@ where
     }
 }
 
+/// Encoder for repeated fields.
 #[derive(Debug)]
 pub struct RepeatedFieldEncoder<T, V: IntoIterator, E> {
     field: FieldEncoder<T, E>,
     values: Option<V::IntoIter>,
+}
+impl<T, V: IntoIterator, E: ValueEncode> RepeatedFieldEncoder<T, V, E> {
+    /// Makes new `RepeatedFieldEncoder` instance.
+    pub fn new(tag: T, value_encoder: E) -> Self {
+        RepeatedFieldEncoder {
+            field: FieldEncoder::new(tag, value_encoder),
+            values: None,
+        }
+    }
 }
 impl<T: Default, V: IntoIterator, E: Default> Default for RepeatedFieldEncoder<T, V, E> {
     fn default() -> Self {
@@ -129,7 +151,9 @@ where
 {
 }
 
-// ordinaly, it is recommended to use `RepeatedNumericFieldDecoder` instead of this
+/// Decoder for packed repeated fields.
+///
+/// Ordinarily, it is recommended to use `RepeatedNumericFieldDecoder` instead of this.
 #[derive(Debug, Default)]
 pub struct PackedRepeatedFieldDecoder<T, V, D>
 where
@@ -140,6 +164,21 @@ where
     decoder: LengthDelimitedDecoder<Collect<D, V>>,
     values: V,
     is_decoding: bool,
+}
+impl<T, V, D> PackedRepeatedFieldDecoder<T, V, D>
+where
+    V: Default + Extend<D::Item>,
+    D: NumericValueDecode,
+{
+    /// Makes a new `PackedRepeatedFieldDecoder` instance.
+    pub fn new(tag: T, value_decoder: D) -> Self {
+        PackedRepeatedFieldDecoder {
+            tag,
+            decoder: LengthDelimitedDecoder::new(value_decoder.collect()),
+            values: V::default(),
+            is_decoding: false,
+        }
+    }
 }
 impl<T, V, D> FieldDecode for PackedRepeatedFieldDecoder<T, V, D>
 where
@@ -193,16 +232,25 @@ where
     }
 }
 
+/// Decoder for repeated numeric fields.
+///
+/// This can decode numeric fields regardless of whether they are packed or not.
 #[derive(Debug, Default)]
 pub struct RepeatedNumericFieldDecoder<T, V, D>
 where
     V: Default + Extend<D::Item>,
     D: NumericValueDecode,
 {
-    decoder: D,
-    packed_decoder: PackedRepeatedFieldDecoder<T, V, D>,
-    is_decoding: bool, // TODO: rename
+    decoder: PackedRepeatedFieldDecoder<T, V, D>,
+    is_decoding: bool,
 }
+// impl<T, V, D> RepeatedNumericFieldDecoder<T, V, D>
+// where
+//     V: Default + Extend<D::Item>,
+//     D: NumericValueDecode,
+// {
+//     pub fn new(tag:
+// }
 impl<T, V, D> FieldDecode for RepeatedNumericFieldDecoder<T, V, D>
 where
     T: Copy + Into<Tag>,
@@ -212,11 +260,11 @@ where
     type Item = V;
 
     fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
-        if self.packed_decoder.tag.into() != tag {
+        if self.decoder.tag.into() != tag {
             Ok(false)
         } else if wire_type == WireType::LengthDelimited {
             track_assert!(!self.is_decoding, ErrorKind::Other);
-            track!(self.packed_decoder.start_decoding(tag, wire_type))?;
+            track!(self.decoder.start_decoding(tag, wire_type))?;
             self.is_decoding = true;
             Ok(true)
         } else {
@@ -227,21 +275,31 @@ where
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        if self.packed_decoder.is_decoding {
-            let size = track!(self.packed_decoder.field_decode(buf, eos))?;
-            if !self.packed_decoder.is_decoding {
+        if self.decoder.is_decoding {
+            let size = track!(self.decoder.field_decode(buf, eos))?;
+            if !self.decoder.is_decoding {
                 self.is_decoding = false;
             }
             Ok(size)
         } else {
-            track_assert!(self.is_decoding, ErrorKind::Other);
-            let (size, item) =
-                track!(self.decoder.decode(buf, eos); self.packed_decoder.tag.into())?;
-            if let Some(value) = item {
-                self.packed_decoder.values.extend(iter::once(value));
-                self.is_decoding = false;
-            }
-            Ok(size)
+            // track_assert!(self.is_decoding, ErrorKind::Other);
+            // let (size, item) = track!(
+            //     self.decoder
+            //         .decoder
+            //         .inner_mut()
+            //         .inner_mut()
+            //         .decode(buf, eos),
+            //     "{:?}",
+            //     self.decoder.tag.into()
+            // )?;
+            // if let Some(value) = item {
+            //     self.decoder.values.extend(iter::once(value));
+            //     self.is_decoding = false;
+            // }
+            // Ok(size)
+
+            // TODO
+            unimplemented!()
         }
     }
 
@@ -251,7 +309,7 @@ where
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
         track_assert!(!self.is_decoding, ErrorKind::InvalidInput);
-        track!(self.packed_decoder.finish_decoding())
+        track!(self.decoder.finish_decoding())
     }
 
     fn requiring_bytes(&self) -> ByteCount {

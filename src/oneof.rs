@@ -1,61 +1,66 @@
 use bytecodec::{ByteCount, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 
-use field::{FieldDecode, FieldEncode, OneOfFieldDecode, OneOfFieldEncode};
+use field::{FieldDecode, FieldEncode, OneofFieldDecode, OneofFieldEncode};
 use tag::Tag;
 use wire::WireType;
 
+/// Value of `Oneof` that has 1-field.
 #[derive(Debug)]
-pub enum OneOf1<A> {
+pub enum Oneof1<A> {
     A(A),
     None,
 }
-impl<A> Default for OneOf1<A> {
+impl<A> Default for Oneof1<A> {
     fn default() -> Self {
-        OneOf1::None
+        Oneof1::None
     }
 }
 
+/// Value of `Oneof` that has 2-fields.
 #[derive(Debug)]
-pub enum OneOf2<A, B> {
+pub enum Oneof2<A, B> {
     A(A),
     B(B),
     None,
 }
-impl<A, B> Default for OneOf2<A, B> {
+impl<A, B> Default for Oneof2<A, B> {
     fn default() -> Self {
-        OneOf2::None
+        Oneof2::None
     }
 }
 
+/// Value of `Oneof` that has 3-fields.
 #[derive(Debug)]
-pub enum OneOf3<A, B, C> {
+pub enum Oneof3<A, B, C> {
     A(A),
     B(B),
     C(C),
     None,
 }
-impl<A, B, C> Default for OneOf3<A, B, C> {
+impl<A, B, C> Default for Oneof3<A, B, C> {
     fn default() -> Self {
-        OneOf3::None
+        Oneof3::None
     }
 }
 
+/// Value of `Oneof` that has 4-fields.
 #[derive(Debug)]
-pub enum OneOf4<A, B, C, D> {
+pub enum Oneof4<A, B, C, D> {
     A(A),
     B(B),
     C(C),
     D(D),
     None,
 }
-impl<A, B, C, D> Default for OneOf4<A, B, C, D> {
+impl<A, B, C, D> Default for Oneof4<A, B, C, D> {
     fn default() -> Self {
-        OneOf4::None
+        Oneof4::None
     }
 }
 
+/// Value of `Oneof` that has 5-fields.
 #[derive(Debug)]
-pub enum OneOf5<A, B, C, D, E> {
+pub enum Oneof5<A, B, C, D, E> {
     A(A),
     B(B),
     C(C),
@@ -63,14 +68,15 @@ pub enum OneOf5<A, B, C, D, E> {
     E(E),
     None,
 }
-impl<A, B, C, D, E> Default for OneOf5<A, B, C, D, E> {
+impl<A, B, C, D, E> Default for Oneof5<A, B, C, D, E> {
     fn default() -> Self {
-        OneOf5::None
+        Oneof5::None
     }
 }
 
+/// Value of `Oneof` that has 6-fields.
 #[derive(Debug)]
-pub enum OneOf6<A, B, C, D, E, F> {
+pub enum Oneof6<A, B, C, D, E, F> {
     A(A),
     B(B),
     C(C),
@@ -79,14 +85,15 @@ pub enum OneOf6<A, B, C, D, E, F> {
     F(F),
     None,
 }
-impl<A, B, C, D, E, F> Default for OneOf6<A, B, C, D, E, F> {
+impl<A, B, C, D, E, F> Default for Oneof6<A, B, C, D, E, F> {
     fn default() -> Self {
-        OneOf6::None
+        Oneof6::None
     }
 }
 
+/// Value of `Oneof` that has 7-fields.
 #[derive(Debug)]
-pub enum OneOf7<A, B, C, D, E, F, G> {
+pub enum Oneof7<A, B, C, D, E, F, G> {
     A(A),
     B(B),
     C(C),
@@ -96,14 +103,15 @@ pub enum OneOf7<A, B, C, D, E, F, G> {
     G(G),
     None,
 }
-impl<A, B, C, D, E, F, G> Default for OneOf7<A, B, C, D, E, F, G> {
+impl<A, B, C, D, E, F, G> Default for Oneof7<A, B, C, D, E, F, G> {
     fn default() -> Self {
-        OneOf7::None
+        Oneof7::None
     }
 }
 
+/// Value of `Oneof` that has 8-fields.
 #[derive(Debug)]
-pub enum OneOf8<A, B, C, D, E, F, G, H> {
+pub enum Oneof8<A, B, C, D, E, F, G, H> {
     A(A),
     B(B),
     C(C),
@@ -114,17 +122,30 @@ pub enum OneOf8<A, B, C, D, E, F, G, H> {
     H(H),
     None,
 }
-impl<A, B, C, D, E, F, G, H> Default for OneOf8<A, B, C, D, E, F, G, H> {
+impl<A, B, C, D, E, F, G, H> Default for Oneof8<A, B, C, D, E, F, G, H> {
     fn default() -> Self {
-        OneOf8::None
+        Oneof8::None
+    }
+}
+
+/// Decoder/encoder for `Oneof` fields.
+#[derive(Debug, Default)]
+pub struct Oneof<F> {
+    fields: F,
+    index: usize,
+}
+impl<F> Oneof<F> {
+    /// Makes a new `Oneof` instance.
+    pub fn new(fields: F) -> Self {
+        Oneof { fields, index: 0 }
     }
 }
 
 macro_rules! impl_field_decode {
     ($oneof:ident, [$($f:ident),*], [$($i:expr),*], [$($j:tt),*]) => {
-        impl<$($f),*> FieldDecode for OneOf<($($f),*,)>
+        impl<$($f),*> FieldDecode for Oneof<($($f),*,)>
         where
-            $($f: OneOfFieldDecode),*
+            $($f: OneofFieldDecode),*
         {
             type Item = $oneof<$($f::Item),*>;
  
@@ -175,9 +196,9 @@ macro_rules! impl_field_decode {
                 *old = new;
             }
         }
-        impl<$($f),*> OneOfFieldDecode for OneOf<($($f),*,)>
+        impl<$($f),*> OneofFieldDecode for Oneof<($($f),*,)>
         where
-            $($f: OneOfFieldDecode),*
+            $($f: OneofFieldDecode),*
         {
         }
     }
@@ -185,9 +206,9 @@ macro_rules! impl_field_decode {
 
 macro_rules! impl_field_encode {
     ($oneof:ident,[$($f:ident),*],[$($i:expr),*],[$($j:tt),*]) => {
-        impl<$($f),*> Encode for OneOf<($($f),*,)>
+        impl<$($f),*> Encode for Oneof<($($f),*,)>
         where
-            $($f: OneOfFieldEncode),*
+            $($f: OneofFieldEncode),*
         {
             type Item = $oneof<$($f::Item),*>;
 
@@ -223,19 +244,19 @@ macro_rules! impl_field_encode {
                 }
             }
         }
-        impl<$($f),*> FieldEncode for OneOf<($($f),*,)>
+        impl<$($f),*> FieldEncode for Oneof<($($f),*,)>
         where
-            $($f: OneOfFieldEncode),*
+            $($f: OneofFieldEncode),*
         {
         }
-        impl<$($f),*> OneOfFieldEncode for OneOf<($($f),*,)>
+        impl<$($f),*> OneofFieldEncode for Oneof<($($f),*,)>
         where
-            $($f: OneOfFieldEncode),*
+            $($f: OneofFieldEncode),*
         {
         }
-        impl<$($f),*> ExactBytesEncode for OneOf<($($f),*,)>
+        impl<$($f),*> ExactBytesEncode for Oneof<($($f),*,)>
         where
-            $($f: OneOfFieldEncode + ExactBytesEncode),*
+            $($f: OneofFieldEncode + ExactBytesEncode),*
         {
             fn exact_requiring_bytes(&self) -> u64 {
                 match self.index {
@@ -247,59 +268,49 @@ macro_rules! impl_field_encode {
     };
 }
 
-#[derive(Debug, Default)]
-pub struct OneOf<F> {
-    fields: F,
-    index: usize,
-}
-impl<F> OneOf<F> {
-    pub fn new(fields: F) -> Self {
-        OneOf { fields, index: 0 }
-    }
-}
-impl_field_decode!(OneOf1, [A], [1], [0]);
-impl_field_decode!(OneOf2, [A, B], [1, 2], [0, 1]);
-impl_field_decode!(OneOf3, [A, B, C], [1, 2, 3], [0, 1, 2]);
-impl_field_decode!(OneOf4, [A, B, C, D], [1, 2, 3, 4], [0, 1, 2, 3]);
-impl_field_decode!(OneOf5, [A, B, C, D, E], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4]);
+impl_field_decode!(Oneof1, [A], [1], [0]);
+impl_field_decode!(Oneof2, [A, B], [1, 2], [0, 1]);
+impl_field_decode!(Oneof3, [A, B, C], [1, 2, 3], [0, 1, 2]);
+impl_field_decode!(Oneof4, [A, B, C, D], [1, 2, 3, 4], [0, 1, 2, 3]);
+impl_field_decode!(Oneof5, [A, B, C, D, E], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4]);
 impl_field_decode!(
-    OneOf6,
+    Oneof6,
     [A, B, C, D, E, F],
     [1, 2, 3, 4, 5, 6],
     [0, 1, 2, 3, 4, 5]
 );
 impl_field_decode!(
-    OneOf7,
+    Oneof7,
     [A, B, C, D, E, F, G],
     [1, 2, 3, 4, 5, 6, 7],
     [0, 1, 2, 3, 4, 5, 6]
 );
 impl_field_decode!(
-    OneOf8,
+    Oneof8,
     [A, B, C, D, E, F, G, H],
     [1, 2, 3, 4, 5, 6, 7, 8],
     [0, 1, 2, 3, 4, 5, 6, 7]
 );
 
-impl_field_encode!(OneOf1, [A], [1], [0]);
-impl_field_encode!(OneOf2, [A, B], [1, 2], [0, 1]);
-impl_field_encode!(OneOf3, [A, B, C], [1, 2, 3], [0, 1, 2]);
-impl_field_encode!(OneOf4, [A, B, C, D], [1, 2, 3, 4], [0, 1, 2, 3]);
-impl_field_encode!(OneOf5, [A, B, C, D, E], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4]);
+impl_field_encode!(Oneof1, [A], [1], [0]);
+impl_field_encode!(Oneof2, [A, B], [1, 2], [0, 1]);
+impl_field_encode!(Oneof3, [A, B, C], [1, 2, 3], [0, 1, 2]);
+impl_field_encode!(Oneof4, [A, B, C, D], [1, 2, 3, 4], [0, 1, 2, 3]);
+impl_field_encode!(Oneof5, [A, B, C, D, E], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4]);
 impl_field_encode!(
-    OneOf6,
+    Oneof6,
     [A, B, C, D, E, F],
     [1, 2, 3, 4, 5, 6],
     [0, 1, 2, 3, 4, 5]
 );
 impl_field_encode!(
-    OneOf7,
+    Oneof7,
     [A, B, C, D, E, F, G],
     [1, 2, 3, 4, 5, 6, 7],
     [0, 1, 2, 3, 4, 5, 6]
 );
 impl_field_encode!(
-    OneOf8,
+    Oneof8,
     [A, B, C, D, E, F, G, H],
     [1, 2, 3, 4, 5, 6, 7, 8],
     [0, 1, 2, 3, 4, 5, 6, 7]

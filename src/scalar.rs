@@ -1,12 +1,12 @@
-//! Encoders and decoders and related components for [scalar] values.
+//! Encoders and decoders for [scalar] values.
 //!
 //! [scalar]: https://developers.google.com/protocol-buffers/docs/proto3#scalar
-use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
 use bytecodec::bytes::{BytesEncoder as BytesEncoderInner, RemainingBytesDecoder, Utf8Decoder,
                        Utf8Encoder};
 use bytecodec::fixnum::{F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, I32leDecoder,
                         I32leEncoder, I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder,
                         U64leDecoder, U64leEncoder};
+use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
 
 use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode,
             OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
@@ -41,7 +41,7 @@ macro_rules! impl_newtype_decode {
                 *old = new;
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_newtype_encode {
@@ -85,7 +85,7 @@ macro_rules! impl_newtype_encode {
                 Ok(())
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_varint_decode {
@@ -119,7 +119,7 @@ macro_rules! impl_varint_decode {
                 *old = new;
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_varint_encode {
@@ -163,12 +163,14 @@ macro_rules! impl_varint_encode {
                 Ok(())
             }
         }
-    }
+    };
 }
 
+/// Decoder for `double` values.
 #[derive(Debug, Default)]
 pub struct DoubleDecoder(F64leDecoder);
 impl DoubleDecoder {
+    /// Makes a new `DoubleDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -176,9 +178,11 @@ impl DoubleDecoder {
 impl_newtype_decode!(DoubleDecoder, f64, Bit64);
 impl NumericValueDecode for DoubleDecoder {}
 
+/// Encoder for `double` values.
 #[derive(Debug, Default)]
 pub struct DoubleEncoder(F64leEncoder);
 impl DoubleEncoder {
+    /// Makes a new `DoubleEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -186,9 +190,11 @@ impl DoubleEncoder {
 impl_newtype_encode!(DoubleEncoder, f64, Bit64);
 impl NumericValueEncode for DoubleEncoder {}
 
+/// Decoder for `float` values.
 #[derive(Debug, Default)]
 pub struct FloatDecoder(F32leDecoder);
 impl FloatDecoder {
+    /// Makes a new `FloatDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -196,9 +202,11 @@ impl FloatDecoder {
 impl_newtype_decode!(FloatDecoder, f32, Bit32);
 impl NumericValueDecode for FloatDecoder {}
 
+/// Encoder for `float` values.
 #[derive(Debug, Default)]
 pub struct FloatEncoder(F32leEncoder);
 impl FloatEncoder {
+    /// Makes a new `FloatEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -206,9 +214,11 @@ impl FloatEncoder {
 impl_newtype_encode!(FloatEncoder, f32, Bit32);
 impl NumericValueEncode for FloatEncoder {}
 
+/// Decoder for `fixed32` values.
 #[derive(Debug, Default)]
 pub struct Fixed32Decoder(U32leDecoder);
 impl Fixed32Decoder {
+    /// Makes a new `Fixed32Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -217,9 +227,11 @@ impl_newtype_decode!(Fixed32Decoder, u32, Bit32);
 impl MapKeyDecode for Fixed32Decoder {}
 impl NumericValueDecode for Fixed32Decoder {}
 
+/// Encoder for `fixed32` values.
 #[derive(Debug, Default)]
 pub struct Fixed32Encoder(U32leEncoder);
 impl Fixed32Encoder {
+    /// Makes a new `Fixed32Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -228,9 +240,11 @@ impl_newtype_encode!(Fixed32Encoder, u32, Bit32);
 impl MapKeyEncode for Fixed32Encoder {}
 impl NumericValueEncode for Fixed32Encoder {}
 
+/// Decoder for `fixed64` values.
 #[derive(Debug, Default)]
 pub struct Fixed64Decoder(U64leDecoder);
 impl Fixed64Decoder {
+    /// Makes a new `Fixed64Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -239,9 +253,11 @@ impl_newtype_decode!(Fixed64Decoder, u64, Bit64);
 impl MapKeyDecode for Fixed64Decoder {}
 impl NumericValueDecode for Fixed64Decoder {}
 
+/// Encoder for `fixed64` values.
 #[derive(Debug, Default)]
 pub struct Fixed64Encoder(U64leEncoder);
 impl Fixed64Encoder {
+    /// Makes a new `Fixed64Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -250,9 +266,11 @@ impl_newtype_encode!(Fixed64Encoder, u64, Bit64);
 impl MapKeyEncode for Fixed64Encoder {}
 impl NumericValueEncode for Fixed64Encoder {}
 
+/// Decoder for `sfixed32` values.
 #[derive(Debug, Default)]
 pub struct Sfixed32Decoder(I32leDecoder);
 impl Sfixed32Decoder {
+    /// Makes a new `Sfixed32Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -261,9 +279,11 @@ impl_newtype_decode!(Sfixed32Decoder, i32, Bit32);
 impl MapKeyDecode for Sfixed32Decoder {}
 impl NumericValueDecode for Sfixed32Decoder {}
 
+/// Encoder for `sfixed32` values.
 #[derive(Debug, Default)]
 pub struct Sfixed32Encoder(I32leEncoder);
 impl Sfixed32Encoder {
+    /// Makes a new `Sfixed32Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -272,9 +292,11 @@ impl_newtype_encode!(Sfixed32Encoder, i32, Bit32);
 impl MapKeyEncode for Sfixed32Encoder {}
 impl NumericValueEncode for Sfixed32Encoder {}
 
+/// Decoder for `sfixed64` values.
 #[derive(Debug, Default)]
 pub struct Sfixed64Decoder(I64leDecoder);
 impl Sfixed64Decoder {
+    /// Makes a new `Sfixed64Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -283,9 +305,11 @@ impl_newtype_decode!(Sfixed64Decoder, i64, Bit64);
 impl MapKeyDecode for Sfixed64Decoder {}
 impl NumericValueDecode for Sfixed64Decoder {}
 
+/// Encoder for `sfixed64` values.
 #[derive(Debug, Default)]
 pub struct Sfixed64Encoder(I64leEncoder);
 impl Sfixed64Encoder {
+    /// Makes a new `Sfixed64Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -294,9 +318,11 @@ impl_newtype_encode!(Sfixed64Encoder, i64, Bit64);
 impl MapKeyEncode for Sfixed64Encoder {}
 impl NumericValueEncode for Sfixed64Encoder {}
 
+/// Decoder for `bool` values.
 #[derive(Debug, Default)]
 pub struct BoolDecoder(VarintDecoder);
 impl BoolDecoder {
+    /// Makes a new `BoolDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -309,9 +335,11 @@ impl_varint_decode!(BoolDecoder, bool);
 impl MapKeyDecode for BoolDecoder {}
 impl NumericValueDecode for BoolDecoder {}
 
+/// Encoder for `bool` values.
 #[derive(Debug, Default)]
 pub struct BoolEncoder(VarintEncoder);
 impl BoolEncoder {
+    /// Makes a new `BoolEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -324,9 +352,11 @@ impl_varint_encode!(BoolEncoder, bool);
 impl MapKeyEncode for BoolEncoder {}
 impl NumericValueEncode for BoolEncoder {}
 
+/// Decoder for `int32` values.
 #[derive(Debug, Default)]
 pub struct Int32Decoder(VarintDecoder);
 impl Int32Decoder {
+    /// Makes a new `Int32Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -339,9 +369,11 @@ impl_varint_decode!(Int32Decoder, i32);
 impl MapKeyDecode for Int32Decoder {}
 impl NumericValueDecode for Int32Decoder {}
 
+/// Encoder for `int32` values.
 #[derive(Debug, Default)]
 pub struct Int32Encoder(VarintEncoder);
 impl Int32Encoder {
+    /// Makes a new `Int32Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -354,9 +386,11 @@ impl_varint_encode!(Int32Encoder, i32);
 impl MapKeyEncode for Int32Encoder {}
 impl NumericValueEncode for Int32Encoder {}
 
+/// Decoder for `int64` values.
 #[derive(Debug, Default)]
 pub struct Int64Decoder(VarintDecoder);
 impl Int64Decoder {
+    /// Makes a new `Int64Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -369,9 +403,11 @@ impl_varint_decode!(Int64Decoder, i64);
 impl MapKeyDecode for Int64Decoder {}
 impl NumericValueDecode for Int64Decoder {}
 
+/// Encoder for `int64` values.
 #[derive(Debug, Default)]
 pub struct Int64Encoder(VarintEncoder);
 impl Int64Encoder {
+    /// Makes a new `Int64Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -384,9 +420,11 @@ impl_varint_encode!(Int64Encoder, i64);
 impl MapKeyEncode for Int64Encoder {}
 impl NumericValueEncode for Int64Encoder {}
 
+/// Decoder for `uint32` values.
 #[derive(Debug, Default)]
 pub struct Uint32Decoder(VarintDecoder);
 impl Uint32Decoder {
+    /// Makes a new `Uint32Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -399,9 +437,11 @@ impl_varint_decode!(Uint32Decoder, u32);
 impl MapKeyDecode for Uint32Decoder {}
 impl NumericValueDecode for Uint32Decoder {}
 
+/// Encoder for `uint32` values.
 #[derive(Debug, Default)]
 pub struct Uint32Encoder(VarintEncoder);
 impl Uint32Encoder {
+    /// Makes a new `Uint32Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -414,9 +454,11 @@ impl_varint_encode!(Uint32Encoder, u32);
 impl MapKeyEncode for Uint32Encoder {}
 impl NumericValueEncode for Uint32Encoder {}
 
+/// Decoder for `uint64` values.
 #[derive(Debug, Default)]
 pub struct Uint64Decoder(VarintDecoder);
 impl Uint64Decoder {
+    /// Makes a new `Uint64Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -429,9 +471,11 @@ impl_varint_decode!(Uint64Decoder, u64);
 impl MapKeyDecode for Uint64Decoder {}
 impl NumericValueDecode for Uint64Decoder {}
 
+/// Encoder for `uint64` values.
 #[derive(Debug, Default)]
 pub struct Uint64Encoder(VarintEncoder);
 impl Uint64Encoder {
+    /// Makes a new `Uint64Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -444,9 +488,11 @@ impl_varint_encode!(Uint64Encoder, u64);
 impl MapKeyEncode for Uint64Encoder {}
 impl NumericValueEncode for Uint64Encoder {}
 
+/// Decoder for `sint32` values.
 #[derive(Debug, Default)]
 pub struct Sint32Decoder(VarintDecoder);
 impl Sint32Decoder {
+    /// Makes a new `Sint32Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -460,9 +506,11 @@ impl_varint_decode!(Sint32Decoder, i32);
 impl MapKeyDecode for Sint32Decoder {}
 impl NumericValueDecode for Sint32Decoder {}
 
+/// Encoder for `sint32` values.
 #[derive(Debug, Default)]
 pub struct Sint32Encoder(VarintEncoder);
 impl Sint32Encoder {
+    /// Makes a new `Sint32Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -475,9 +523,11 @@ impl_varint_encode!(Sint32Encoder, i32);
 impl MapKeyEncode for Sint32Encoder {}
 impl NumericValueEncode for Sint32Encoder {}
 
+/// Decoder for `sint64` values.
 #[derive(Debug, Default)]
 pub struct Sint64Decoder(VarintDecoder);
 impl Sint64Decoder {
+    /// Makes a new `Sint64Decoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -491,9 +541,11 @@ impl_varint_decode!(Sint64Decoder, i64);
 impl MapKeyDecode for Sint64Decoder {}
 impl NumericValueDecode for Sint64Decoder {}
 
+/// Encoder for `sint64` values.
 #[derive(Debug, Default)]
 pub struct Sint64Encoder(VarintEncoder);
 impl Sint64Encoder {
+    /// Makes a new `Sint64Encoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -506,17 +558,45 @@ impl_varint_encode!(Sint64Encoder, i64);
 impl MapKeyEncode for Sint64Encoder {}
 impl NumericValueEncode for Sint64Encoder {}
 
+/// Decoder for `bytes` values.
 #[derive(Debug, Default)]
 pub struct BytesDecoder(LengthDelimitedDecoder<RemainingBytesDecoder>);
 impl BytesDecoder {
+    /// Makes a new `BytesDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
 }
 impl_newtype_decode!(BytesDecoder, Vec<u8>, LengthDelimited);
 
+/// Decoder for custom `bytes` values.
+///
+/// This is equivalent to `BytesDecoder` in the protobol buffers layer,
+/// but it decodes the payload bytes by using `D` and
+/// returns the decoded items to the application layer instead of raw bytes.
 #[derive(Debug, Default)]
-pub struct CustomBytesDecoder<D>(LengthDelimitedDecoder<D>); // TODO: new
+pub struct CustomBytesDecoder<D>(LengthDelimitedDecoder<D>);
+impl<D: Decode> CustomBytesDecoder<D> {
+    /// Makes a new `CustomBytesDecoder` instance.
+    pub fn new(inner: D) -> Self {
+        CustomBytesDecoder(LengthDelimitedDecoder::new(inner))
+    }
+
+    /// Returns a reference to the inner decoder.
+    pub fn inner_ref(&self) -> &D {
+        self.0.inner_ref()
+    }
+
+    /// Returns a mutable reference to the inner decoder.
+    pub fn inner_mut(&mut self) -> &mut D {
+        self.0.inner_mut()
+    }
+
+    /// Takes ownership of the instance and returns the inner decoder.
+    pub fn into_inner(self) -> D {
+        self.0.into_inner()
+    }
+}
 impl<D: Decode> Decode for CustomBytesDecoder<D> {
     type Item = D::Item;
 
@@ -538,9 +618,11 @@ impl<D: Decode> ValueDecode for CustomBytesDecoder<D> {
     }
 }
 
+/// Encoder for `bytes` values.
 #[derive(Debug)]
 pub struct BytesEncoder<B = Vec<u8>>(LengthDelimitedEncoder<BytesEncoderInner<B>>);
 impl<B> BytesEncoder<B> {
+    /// Makes a new `BytesEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -590,8 +672,33 @@ impl<B: AsRef<[u8]>> OptionalValueEncode for BytesEncoder<B> {
     }
 }
 
+/// Encoder for custom `bytes` values.
+///
+/// This is equivalent to `BytesEncoder` in the protobol buffers layer,
+/// but it uses the encoder `E` for producing bytes instead of passing raw bytes.
 #[derive(Debug, Default)]
-pub struct CustomBytesEncoder<E>(LengthDelimitedEncoder<E>); // TODO: new
+pub struct CustomBytesEncoder<E>(LengthDelimitedEncoder<E>);
+impl<E: ExactBytesEncode> CustomBytesEncoder<E> {
+    /// Makes a new `CustomBytesEncoder` instance.
+    pub fn new(inner: E) -> Self {
+        CustomBytesEncoder(LengthDelimitedEncoder::new(inner))
+    }
+
+    /// Returns a reference to the inner encoder.
+    pub fn inner_ref(&self) -> &E {
+        self.0.inner_ref()
+    }
+
+    /// Returns a mutable reference to the inner encoder.
+    pub fn inner_mut(&mut self) -> &mut E {
+        self.0.inner_mut()
+    }
+
+    /// Takes ownership of the instance and returns the inner encoder.
+    pub fn into_inner(self) -> E {
+        self.0.into_inner()
+    }
+}
 impl<E: ExactBytesEncode> Encode for CustomBytesEncoder<E> {
     type Item = E::Item;
 
@@ -622,9 +729,11 @@ impl<E: ExactBytesEncode> ValueEncode for CustomBytesEncoder<E> {
     }
 }
 
+/// Decoder for `string` values.
 #[derive(Debug, Default)]
 pub struct StringDecoder(LengthDelimitedDecoder<Utf8Decoder>);
 impl StringDecoder {
+    /// Makes a new `StringDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -632,9 +741,11 @@ impl StringDecoder {
 impl_newtype_decode!(StringDecoder, String, LengthDelimited);
 impl MapKeyDecode for StringDecoder {}
 
+/// Encoder for `string` values.
 #[derive(Debug)]
 pub struct StringEncoder<S = String>(LengthDelimitedEncoder<Utf8Encoder<S>>);
 impl<S> StringEncoder<S> {
+    /// Makes a new `StringEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
@@ -697,7 +808,7 @@ mod test {
             let mut decoder = $decoder::new();
             let item = track_try_unwrap!(decoder.decode_exact($bytes.as_ref()));
             assert_eq!(item, $value);
-        }
+        };
     }
 
     macro_rules! assert_encode {
@@ -706,7 +817,7 @@ mod test {
             let mut encoder = track_try_unwrap!($encoder::with_item($value));
             track_try_unwrap!(encoder.encode_all(&mut buf));
             assert_eq!(buf, $bytes);
-        }
+        };
     }
 
     #[test]
