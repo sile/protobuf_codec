@@ -6,6 +6,7 @@ use wire::WireType;
 
 /// Value of `Oneof` that has 1-field.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof1<A> {
     A(A),
     None,
@@ -18,6 +19,7 @@ impl<A> Default for Oneof1<A> {
 
 /// Value of `Oneof` that has 2-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof2<A, B> {
     A(A),
     B(B),
@@ -31,6 +33,7 @@ impl<A, B> Default for Oneof2<A, B> {
 
 /// Value of `Oneof` that has 3-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof3<A, B, C> {
     A(A),
     B(B),
@@ -45,6 +48,7 @@ impl<A, B, C> Default for Oneof3<A, B, C> {
 
 /// Value of `Oneof` that has 4-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof4<A, B, C, D> {
     A(A),
     B(B),
@@ -60,6 +64,7 @@ impl<A, B, C, D> Default for Oneof4<A, B, C, D> {
 
 /// Value of `Oneof` that has 5-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof5<A, B, C, D, E> {
     A(A),
     B(B),
@@ -76,6 +81,7 @@ impl<A, B, C, D, E> Default for Oneof5<A, B, C, D, E> {
 
 /// Value of `Oneof` that has 6-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof6<A, B, C, D, E, F> {
     A(A),
     B(B),
@@ -93,6 +99,7 @@ impl<A, B, C, D, E, F> Default for Oneof6<A, B, C, D, E, F> {
 
 /// Value of `Oneof` that has 7-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof7<A, B, C, D, E, F, G> {
     A(A),
     B(B),
@@ -111,6 +118,7 @@ impl<A, B, C, D, E, F, G> Default for Oneof7<A, B, C, D, E, F, G> {
 
 /// Value of `Oneof` that has 8-fields.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum Oneof8<A, B, C, D, E, F, G, H> {
     A(A),
     B(B),
@@ -128,7 +136,7 @@ impl<A, B, C, D, E, F, G, H> Default for Oneof8<A, B, C, D, E, F, G, H> {
     }
 }
 
-/// Decoder/encoder for `Oneof` fields.
+/// Decoder and encoder for `Oneof` fields.
 #[derive(Debug, Default)]
 pub struct Oneof<F> {
     fields: F,

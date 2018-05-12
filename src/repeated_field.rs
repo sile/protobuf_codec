@@ -6,7 +6,7 @@ use std::mem;
 
 use field::{FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, Fields,
             RepeatedMessageFieldDecoder, RepeatedMessageFieldEncoder};
-use message::{MessageDecoder, MessageEncoder};
+use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder, MessageDecoder, MessageEncoder};
 use scalar::BytesEncoder;
 use tag::{Tag, Tag1, Tag2};
 use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode,
@@ -179,6 +179,10 @@ where
             is_decoding: false,
         }
     }
+
+    fn inner_mut(&mut self) -> &mut D {
+        self.decoder.inner_mut().inner_mut()
+    }
 }
 impl<T, V, D> FieldDecode for PackedRepeatedFieldDecoder<T, V, D>
 where
@@ -244,13 +248,19 @@ where
     decoder: PackedRepeatedFieldDecoder<T, V, D>,
     is_decoding: bool,
 }
-// impl<T, V, D> RepeatedNumericFieldDecoder<T, V, D>
-// where
-//     V: Default + Extend<D::Item>,
-//     D: NumericValueDecode,
-// {
-//     pub fn new(tag:
-// }
+impl<T, V, D> RepeatedNumericFieldDecoder<T, V, D>
+where
+    V: Default + Extend<D::Item>,
+    D: NumericValueDecode,
+{
+    /// Makes a new `RepeatedNumericFieldDecoder` instance.
+    pub fn new(tag: T, value_decoder: D) -> Self {
+        RepeatedNumericFieldDecoder {
+            decoder: PackedRepeatedFieldDecoder::new(tag, value_decoder),
+            is_decoding: false,
+        }
+    }
+}
 impl<T, V, D> FieldDecode for RepeatedNumericFieldDecoder<T, V, D>
 where
     T: Copy + Into<Tag>,
@@ -282,24 +292,14 @@ where
             }
             Ok(size)
         } else {
-            // track_assert!(self.is_decoding, ErrorKind::Other);
-            // let (size, item) = track!(
-            //     self.decoder
-            //         .decoder
-            //         .inner_mut()
-            //         .inner_mut()
-            //         .decode(buf, eos),
-            //     "{:?}",
-            //     self.decoder.tag.into()
-            // )?;
-            // if let Some(value) = item {
-            //     self.decoder.values.extend(iter::once(value));
-            //     self.is_decoding = false;
-            // }
-            // Ok(size)
-
-            // TODO
-            unimplemented!()
+            track_assert!(self.is_decoding, ErrorKind::Other);
+            let (size, item) =
+                track!(self.decoder.inner_mut().decode(buf, eos); self.decoder.tag.into())?;
+            if let Some(value) = item {
+                self.decoder.values.extend(iter::once(value));
+                self.is_decoding = false;
+            }
+            Ok(size)
         }
     }
 
@@ -325,6 +325,7 @@ where
     }
 }
 
+/// Decoder for map fields.
 #[derive(Default)]
 pub struct MapFieldDecoder<T, M, K, V>
 where
@@ -336,6 +337,18 @@ where
         M,
         MessageDecoder<Fields<(FieldDecoder<Tag1, K>, FieldDecoder<Tag2, V>)>>,
     >,
+}
+impl<T, M: Default, K: MapKeyDecode, V: ValueDecode> MapFieldDecoder<T, M, K, V> {
+    /// Makes a new `MapFieldDecoder` instance.
+    pub fn new(tag: T, key_decoder: K, value_decoder: V) -> Self {
+        let fields = Fields::new((
+            FieldDecoder::new(Tag1, key_decoder),
+            FieldDecoder::new(Tag2, value_decoder),
+        ));
+        let message = MessageDecoder::new(fields);
+        let inner = RepeatedMessageFieldDecoder::new(tag, EmbeddedMessageDecoder::new(message));
+        MapFieldDecoder { inner }
+    }
 }
 impl<T, M, K, V> FieldDecode for MapFieldDecoder<T, M, K, V>
 where
@@ -380,15 +393,28 @@ where
     }
 }
 
+/// Encoder for packed repeated fields.
 #[derive(Debug)]
-pub struct PackedRepeatedFieldEncoder<T, F: IntoIterator, E> {
+pub struct PackedRepeatedFieldEncoder<T, V: IntoIterator, E> {
     tag: T,
-    values: Option<F::IntoIter>,
+    values: Option<V::IntoIter>,
     tag_and_type_encoder: TagAndTypeEncoder,
     value_encoder: E,
     bytes_encoder: BytesEncoder,
 }
-impl<T: Default, F: IntoIterator, E: Default> Default for PackedRepeatedFieldEncoder<T, F, E> {
+impl<T, V: IntoIterator, E> PackedRepeatedFieldEncoder<T, V, E> {
+    /// Makes a new `PackedRepeatedFieldEncoder` instance.
+    pub fn new(tag: T, value_encoder: E) -> Self {
+        PackedRepeatedFieldEncoder {
+            tag,
+            values: None,
+            tag_and_type_encoder: TagAndTypeEncoder::new(),
+            value_encoder,
+            bytes_encoder: BytesEncoder::new(),
+        }
+    }
+}
+impl<T: Default, V: IntoIterator, E: Default> Default for PackedRepeatedFieldEncoder<T, V, E> {
     fn default() -> Self {
         PackedRepeatedFieldEncoder {
             tag: T::default(),
@@ -399,13 +425,13 @@ impl<T: Default, F: IntoIterator, E: Default> Default for PackedRepeatedFieldEnc
         }
     }
 }
-impl<T, F, E> Encode for PackedRepeatedFieldEncoder<T, F, E>
+impl<T, V, E> Encode for PackedRepeatedFieldEncoder<T, V, E>
 where
     T: Copy + Into<Tag>,
-    F: IntoIterator<Item = E::Item>,
+    V: IntoIterator<Item = E::Item>,
     E: NumericValueEncode,
 {
-    type Item = F;
+    type Item = V;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         let mut offset = 0;
@@ -458,6 +484,7 @@ where
 {
 }
 
+/// Encoder for map fields.
 #[derive(Default)]
 pub struct MapFieldEncoder<T, M: IntoIterator, K, V> {
     inner: RepeatedMessageFieldEncoder<
@@ -465,6 +492,24 @@ pub struct MapFieldEncoder<T, M: IntoIterator, K, V> {
         M,
         MessageEncoder<Fields<(FieldEncoder<Tag1, K>, FieldEncoder<Tag2, V>)>>,
     >,
+}
+impl<T, M, K, V> MapFieldEncoder<T, M, K, V>
+where
+    T: Copy + Into<Tag>,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
+    K: ExactBytesEncode + MapKeyEncode,
+    V: ExactBytesEncode + ValueEncode,
+{
+    /// Makes a new `MapFieldEncoder` instance.
+    pub fn new(tag: T, key_encoder: K, value_encoder: V) -> Self {
+        let fields = Fields::new((
+            FieldEncoder::new(Tag1, key_encoder),
+            FieldEncoder::new(Tag2, value_encoder),
+        ));
+        let message = MessageEncoder::new(fields);
+        let inner = RepeatedMessageFieldEncoder::new(tag, EmbeddedMessageEncoder::new(message));
+        MapFieldEncoder { inner }
+    }
 }
 impl<T, M, K, V> Encode for MapFieldEncoder<T, M, K, V>
 where

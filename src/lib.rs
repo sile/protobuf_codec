@@ -9,6 +9,7 @@
 //! [proto2]: https://developers.google.com/protocol-buffers/docs/proto
 //! [proto3]: https://developers.google.com/protocol-buffers/docs/proto3
 //! [encoding]: https://developers.google.com/protocol-buffers/docs/encoding
+#![warn(missing_docs)]
 #[macro_use]
 extern crate bytecodec;
 #[macro_use]

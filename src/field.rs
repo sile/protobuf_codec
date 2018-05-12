@@ -1,4 +1,4 @@
-//! Encoders and decoders and related components for message fields.
+//! Encoders, decoders and traits for message fields.
 use bytecodec::bytes::CopyableBytesDecoder;
 use bytecodec::combinator::SkipRemaining;
 use bytecodec::value::NullDecoder;

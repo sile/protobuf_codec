@@ -1,17 +1,22 @@
-use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
+//! Encoders, decoders and traits for messages.
 use bytecodec::combinator::PreEncode;
+use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
 use value::{OptionalValueDecode, ValueDecode, ValueEncode};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder, WireType};
 
+/// This trait allows for decoding messages.
 pub trait MessageDecode: Decode {
+    /// Merges duplicate messages.
     fn merge_messages(old: &mut Self::Item, new: Self::Item);
 }
 
+/// This trait allows for encoding messages.
 pub trait MessageEncode: Encode {}
 impl<M: MessageEncode> MessageEncode for PreEncode<M> {}
 
+/// Decoder for messages.
 #[derive(Debug, Default)]
 pub struct MessageDecoder<F> {
     tag_and_type: TagAndTypeDecoder,
@@ -19,6 +24,7 @@ pub struct MessageDecoder<F> {
     unknown_field: UnknownFieldDecoder,
 }
 impl<F: FieldDecode> MessageDecoder<F> {
+    /// Makes a new `MessageDecoder` instance.
     pub fn new(field_decoder: F) -> Self {
         MessageDecoder {
             tag_and_type: TagAndTypeDecoder::default(),
@@ -78,8 +84,15 @@ impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {
     }
 }
 
+/// Decoder for embedded messages.
 #[derive(Debug, Default)]
 pub struct EmbeddedMessageDecoder<M>(LengthDelimitedDecoder<M>);
+impl<M: MessageDecode> EmbeddedMessageDecoder<M> {
+    /// Makes a new `EmbeddedMessageDecoder` instance.
+    pub fn new(message_decoder: M) -> Self {
+        EmbeddedMessageDecoder(LengthDelimitedDecoder::new(message_decoder))
+    }
+}
 impl<M: MessageDecode> Decode for EmbeddedMessageDecoder<M> {
     type Item = M::Item;
 
@@ -119,11 +132,13 @@ impl<M: MessageDecode> OptionalValueDecode for EmbeddedMessageDecoder<M> {
     }
 }
 
+/// Encoder for messages.
 #[derive(Debug, Default)]
 pub struct MessageEncoder<F> {
     field: F,
 }
 impl<F: FieldEncode> MessageEncoder<F> {
+    /// Makes a new `MessageEncoder` instance.
     pub fn new(field_encoder: F) -> Self {
         MessageEncoder {
             field: field_encoder,
@@ -156,11 +171,13 @@ impl<F: FieldEncode + ExactBytesEncode> ExactBytesEncode for MessageEncoder<F> {
 }
 impl<F: FieldEncode> MessageEncode for MessageEncoder<F> {}
 
+/// Encoder for embedded messages.
 #[derive(Debug, Default)]
 pub struct EmbeddedMessageEncoder<M> {
     message: LengthDelimitedEncoder<M>,
 }
 impl<M: MessageEncode + ExactBytesEncode> EmbeddedMessageEncoder<M> {
+    /// Makes a new `EmbeddedMessageEncoder` instance.
     pub fn new(message_encoder: M) -> Self {
         EmbeddedMessageEncoder {
             message: LengthDelimitedEncoder::new(message_encoder),
