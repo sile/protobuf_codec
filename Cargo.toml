@@ -1,18 +1,18 @@
 [package]
 name = "protobuf_codec"
-version = "0.0.8"
+version = "0.1.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
-description = "An asynchronous encoder/decoder for Protocol Buffers"
-homepage = "https://github.com/sile/pbcodec"
-repository = "https://github.com/sile/pbcodec"
+description = "Encoders and decoders for Protocol Buffers based on bytecodec crate"
+homepage = "https://github.com/sile/protobuf_codec"
+repository = "https://github.com/sile/protobuf_codec"
 readme = "README.md"
-keywords = []
+keywords = ["protocol-buffers"]
 categories = []
 license = "MIT"
 
 [badges]
-travis-ci = {repository = "sile/pbcodec"}
-codecov = {repository = "sile/pbcodec"}
+travis-ci = {repository = "sile/protobuf_codec"}
+codecov = {repository = "sile/protobuf_codec"}
 
 [dependencies]
 bytecodec = "0.3"
