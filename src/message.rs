@@ -1,6 +1,6 @@
 //! Encoders, decoders and traits for messages.
 use bytecodec::combinator::PreEncode;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
 use value::{OptionalValueDecode, ValueDecode, ValueEncode};
@@ -22,6 +22,7 @@ pub struct MessageDecoder<F> {
     tag: TagDecoder,
     field: F,
     unknown_field: UnknownFieldDecoder,
+    is_tag_decoding: bool,
 }
 impl<F: FieldDecode> MessageDecoder<F> {
     /// Makes a new `MessageDecoder` instance.
@@ -30,6 +31,7 @@ impl<F: FieldDecode> MessageDecoder<F> {
             tag: TagDecoder::default(),
             field: field_decoder,
             unknown_field: UnknownFieldDecoder::default(),
+            is_tag_decoding: false,
         }
     }
 }
@@ -54,16 +56,20 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
             } else {
                 let (size, item) = track!(self.tag.decode(&buf[offset..], eos))?;
                 offset += size;
+                if size != 0 {
+                    self.is_tag_decoding = true;
+                }
                 if let Some(tag) = item {
                     let started = track!(self.field.start_decoding(tag))?;
                     if !started {
                         track!(self.unknown_field.start_decoding(tag))?;
                     }
+                    self.is_tag_decoding = false;
                 }
             }
         }
         if eos.is_reached() {
-            let _ = track!(self.tag.decode(&[][..], eos))?; // Unexpected EOS check
+            track_assert!(!self.is_tag_decoding, ErrorKind::UnexpectedEos);
             let v = track!(self.field.finish_decoding())?;
             track!(self.unknown_field.finish_decoding())?;
             Ok((offset, Some(v)))

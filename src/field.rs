@@ -142,7 +142,7 @@ where
     }
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
-        track_assert!(!self.is_decoding, ErrorKind::Other);
+        track_assert!(!self.is_decoding, ErrorKind::Other, "{:?}", self.num.into());
         let v = track_assert_some!(
             self.decoded.take(),
             ErrorKind::InvalidInput,
@@ -439,6 +439,12 @@ where
     }
 }
 impl<F, E> FieldEncode for FieldEncoder<F, E>
+where
+    F: Copy + Into<FieldNum>,
+    E: ValueEncode,
+{
+}
+impl<F, E> OneofFieldEncode for FieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: ValueEncode,

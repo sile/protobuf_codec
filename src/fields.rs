@@ -33,7 +33,7 @@ macro_rules! impl_field_decode {
 
             fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
                 $(if self.fields.$i.is_decoding() {
-                    return track!(self.fields.0.field_decode(buf, eos), "i={}", $i);
+                    return track!(self.fields.$i.field_decode(buf, eos), "i={}", $i);
                 })*
                 track_panic!(ErrorKind::Other)
             }

@@ -5,7 +5,7 @@ use field::{FieldDecode, FieldEncode, OneofFieldDecode, OneofFieldEncode};
 use wire::Tag;
 
 /// Value of `Oneof` that has 1-field.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch1<A> {
     A(A),
@@ -18,7 +18,7 @@ impl<A> Default for Branch1<A> {
 }
 
 /// Value of `Oneof` that has 2-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch2<A, B> {
     A(A),
@@ -32,7 +32,7 @@ impl<A, B> Default for Branch2<A, B> {
 }
 
 /// Value of `Oneof` that has 3-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch3<A, B, C> {
     A(A),
@@ -47,7 +47,7 @@ impl<A, B, C> Default for Branch3<A, B, C> {
 }
 
 /// Value of `Oneof` that has 4-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch4<A, B, C, D> {
     A(A),
@@ -63,7 +63,7 @@ impl<A, B, C, D> Default for Branch4<A, B, C, D> {
 }
 
 /// Value of `Oneof` that has 5-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch5<A, B, C, D, E> {
     A(A),
@@ -80,7 +80,7 @@ impl<A, B, C, D, E> Default for Branch5<A, B, C, D, E> {
 }
 
 /// Value of `Oneof` that has 6-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch6<A, B, C, D, E, F> {
     A(A),
@@ -98,7 +98,7 @@ impl<A, B, C, D, E, F> Default for Branch6<A, B, C, D, E, F> {
 }
 
 /// Value of `Oneof` that has 7-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch7<A, B, C, D, E, F, G> {
     A(A),
@@ -117,7 +117,7 @@ impl<A, B, C, D, E, F, G> Default for Branch7<A, B, C, D, E, F, G> {
 }
 
 /// Value of `Oneof` that has 8-fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(missing_docs)]
 pub enum Branch8<A, B, C, D, E, F, G, H> {
     A(A),
