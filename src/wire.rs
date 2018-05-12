@@ -7,7 +7,25 @@ use bytecodec::bytes::BytesEncoder;
 use bytecodec::combinator::{Buffered, Length};
 use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 
-use tag::Tag;
+use field::num::FieldNum;
+
+/// Field tag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Tag {
+    /// Field number.
+    pub field_num: FieldNum,
+
+    /// Wire type of the value of the field.
+    pub wire_type: WireType,
+}
+impl From<(FieldNum, WireType)> for Tag {
+    fn from((field_num, wire_type): (FieldNum, WireType)) -> Self {
+        Tag {
+            field_num,
+            wire_type,
+        }
+    }
+}
 
 /// Wire type.
 ///
@@ -25,23 +43,23 @@ pub enum WireType {
     LengthDelimited = 2,
 }
 
-/// Decoder for field tag and wire type.
+/// Decoder for tags.
 #[derive(Debug, Default)]
-pub struct TagAndTypeDecoder(VarintDecoder);
-impl TagAndTypeDecoder {
-    /// Makes a new `TagAndTypeDecoder` instance.
+pub struct TagDecoder(VarintDecoder);
+impl TagDecoder {
+    /// Makes a new `TagDecoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
 }
-impl Decode for TagAndTypeDecoder {
-    type Item = (Tag, WireType);
+impl Decode for TagDecoder {
+    type Item = Tag;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
         let (size, item) = track!(self.0.decode(buf, eos))?;
         if let Some(n) = item {
-            let tag = n >> 3;
-            track_assert!(tag <= 0xFFFF_FFFF, ErrorKind::InvalidInput; tag);
+            let field_num = n >> 3;
+            track_assert!(field_num <= 0xFFFF_FFFF, ErrorKind::InvalidInput; field_num);
 
             let wire_type = match n & 0b111 {
                 0 => WireType::Varint,
@@ -49,11 +67,17 @@ impl Decode for TagAndTypeDecoder {
                 1 => WireType::Bit64,
                 2 => WireType::LengthDelimited,
                 wire_type => {
-                    track_panic!(ErrorKind::InvalidInput, "Unknown wire type"; wire_type, tag)
+                    track_panic!(ErrorKind::InvalidInput, "Unknown wire type"; wire_type, field_num);
                 }
             };
-            let tag = track!(Tag::new(tag as u32))?;
-            Ok((size, Some((tag, wire_type))))
+            let field_num = track!(FieldNum::new(field_num as u32))?;
+            Ok((
+                size,
+                Some(Tag {
+                    field_num,
+                    wire_type,
+                }),
+            ))
         } else {
             Ok((size, None))
         }
@@ -64,24 +88,24 @@ impl Decode for TagAndTypeDecoder {
     }
 }
 
-/// Encoder for field tag and wire type.
+/// Encoder for tags.
 #[derive(Debug, Default)]
-pub struct TagAndTypeEncoder(VarintEncoder);
-impl TagAndTypeEncoder {
-    /// Makes a new `TagAndTypeEncoder` instance.
+pub struct TagEncoder(VarintEncoder);
+impl TagEncoder {
+    /// Makes a new `TagEncoder` instance.
     pub fn new() -> Self {
         Self::default()
     }
 }
-impl Encode for TagAndTypeEncoder {
-    type Item = (Tag, WireType);
+impl Encode for TagEncoder {
+    type Item = Tag;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         track!(self.0.encode(buf, eos))
     }
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let n = u64::from(item.0.as_u32() << 3) | (item.1 as u64);
+        let n = u64::from(item.field_num.as_u32() << 3) | (item.wire_type as u64);
         track!(self.0.start_encoding(n))
     }
 
@@ -93,7 +117,7 @@ impl Encode for TagAndTypeEncoder {
         self.0.requiring_bytes()
     }
 }
-impl ExactBytesEncode for TagAndTypeEncoder {
+impl ExactBytesEncode for TagEncoder {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
     }

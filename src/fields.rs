@@ -1,8 +1,7 @@
 use bytecodec::{ByteCount, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
 
 use field::{FieldDecode, FieldEncode};
-use tag::Tag;
-use wire::WireType;
+use wire::Tag;
 
 /// Decoder and encoder for multiple fields.
 #[derive(Debug, Default)]
@@ -24,8 +23,8 @@ macro_rules! impl_field_decode {
         {
             type Item = ($($f::Item),*,);
 
-            fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
-                $(if track!(self.fields.$i.start_decoding(tag, wire_type), "i={}", $i)? {
+            fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
+                $(if track!(self.fields.$i.start_decoding(tag); tag)? {
                     return Ok(true);
                 })*
                 Ok(false)

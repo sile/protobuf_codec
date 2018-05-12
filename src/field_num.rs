@@ -1,15 +1,14 @@
-//! Field tag.
 use bytecodec::{ErrorKind, Result};
 
-/// Field tag (a.k.a, field number).
+/// Field number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Tag(u32);
-impl Tag {
-    /// Makes a new `Tag` instance.
+pub struct FieldNum(u32);
+impl FieldNum {
+    /// Makes a new `FieldNum` instance.
     ///
     /// # Errors
     ///
-    /// [The language guide] says about the valid values of a tag as follows:
+    /// [The language guide] says about the valid values of a field number as follows:
     ///
     /// > The smallest field number you can specify is `1`, and the largest is `2^29 - 1`, or `536,870,911`.
     /// > You also cannot use the numbers `19000` through `19999`, as they are reserved for
@@ -22,106 +21,106 @@ impl Tag {
         track_assert_ne!(n, 0, ErrorKind::InvalidInput);
         track_assert!(n < (2 << 29), ErrorKind::InvalidInput; n);
         track_assert!(!(19_000 <= n && n < 20_000), ErrorKind::InvalidInput; n);
-        Ok(Tag(n))
+        Ok(FieldNum(n))
     }
 
-    /// Makes a new `Tag` instance without checking the value.
+    /// Makes a new `FieldNum` instance without checking the value.
     pub unsafe fn new_unchecked(n: u32) -> Self {
-        Tag(n)
+        FieldNum(n)
     }
 
-    /// Returns the number of the tag.
+    /// Returns the value of the field number.
     pub fn as_u32(&self) -> u32 {
         self.0
     }
 }
 
 macro_rules! impl_from {
-    ($tag:ty, $n:expr) => {
-        impl From<$tag> for Tag {
-            fn from(_: $tag) -> Self {
-                Tag($n)
+    ($ty:ty, $n:expr) => {
+        impl From<$ty> for FieldNum {
+            fn from(_: $ty) -> Self {
+                FieldNum($n)
             }
         }
     };
 }
 
-/// Tag of the number `1`.
+/// Field number `1`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag1;
-impl_from!(Tag1, 1);
+pub struct F1;
+impl_from!(F1, 1);
 
-/// Tag of the number `2`.
+/// Field number `2`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag2;
-impl_from!(Tag2, 2);
+pub struct F2;
+impl_from!(F2, 2);
 
-/// Tag of the number `3`.
+/// Field number `3`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag3;
-impl_from!(Tag3, 3);
+pub struct F3;
+impl_from!(F3, 3);
 
-/// Tag of the number `4`.
+/// Field number `4`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag4;
-impl_from!(Tag4, 4);
+pub struct F4;
+impl_from!(F4, 4);
 
-/// Tag of the number `5`.
+/// Field number `5`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag5;
-impl_from!(Tag5, 5);
+pub struct F5;
+impl_from!(F5, 5);
 
-/// Tag of the number `6`.
+/// Field number `6`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag6;
-impl_from!(Tag6, 6);
+pub struct F6;
+impl_from!(F6, 6);
 
-/// Tag of the number `7`.
+/// Field number `7`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag7;
-impl_from!(Tag7, 7);
+pub struct F7;
+impl_from!(F7, 7);
 
-/// Tag of the number `8`.
+/// Field number `8`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag8;
-impl_from!(Tag8, 8);
+pub struct F8;
+impl_from!(F8, 8);
 
-/// Tag of the number `9`.
+/// Field number `9`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag9;
-impl_from!(Tag9, 9);
+pub struct F9;
+impl_from!(F9, 9);
 
-/// Tag of the number `10`.
+/// Field number `10`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag10;
-impl_from!(Tag10, 10);
+pub struct F10;
+impl_from!(F10, 10);
 
-/// Tag of the number `11`.
+/// Field number `11`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag11;
-impl_from!(Tag11, 11);
+pub struct F11;
+impl_from!(F11, 11);
 
-/// Tag of the number `12`.
+/// Field number `12`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag12;
-impl_from!(Tag12, 12);
+pub struct F12;
+impl_from!(F12, 12);
 
-/// Tag of the number `13`.
+/// Field number `13`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag13;
-impl_from!(Tag13, 13);
+pub struct F13;
+impl_from!(F13, 13);
 
-/// Tag of the number `14`.
+/// Field number `14`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag14;
-impl_from!(Tag14, 14);
+pub struct F14;
+impl_from!(F14, 14);
 
-/// Tag of the number `15`.
+/// Field number `15`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag15;
-impl_from!(Tag15, 15);
+pub struct F15;
+impl_from!(F15, 15);
 
-/// Tag of the number `16`.
+/// Field number `16`.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Tag16;
-impl_from!(Tag16, 16);
+pub struct F16;
+impl_from!(F16, 16);

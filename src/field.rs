@@ -1,4 +1,4 @@
-//! Encoders, decoders and traits for message fields.
+//! Encoders, decoders and related components for message fields.
 use bytecodec::bytes::CopyableBytesDecoder;
 use bytecodec::combinator::SkipRemaining;
 use bytecodec::value::NullDecoder;
@@ -6,29 +6,45 @@ use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Res
 use std::fmt;
 
 pub use fields::Fields;
-pub use oneof::{Oneof, Oneof1, Oneof2, Oneof3, Oneof4, Oneof5, Oneof6, Oneof7, Oneof8};
+pub use oneof::Oneof;
 pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, PackedRepeatedFieldDecoder,
                          PackedRepeatedFieldEncoder, RepeatedFieldDecoder, RepeatedFieldEncoder,
                          RepeatedNumericFieldDecoder};
 
+pub mod num {
+    //! Field number.
+
+    pub use field_num::*;
+}
+pub mod branch {
+    //! Values for `Oneof` fields.
+
+    pub use oneof::{Branch1, Branch2, Branch3, Branch4, Branch5, Branch6, Branch7, Branch8};
+}
+pub mod value {
+    //! Traits for representing encoders and decoders of field values.
+
+    pub use value::*;
+}
+
+use field_num::FieldNum;
 use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder};
-use tag::Tag;
 use value::{OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
-use wire::{LengthDelimitedDecoder, TagAndTypeEncoder, VarintDecoder, WireType};
+use wire::{LengthDelimitedDecoder, Tag, TagEncoder, VarintDecoder, WireType};
 
 /// Decoder for fields that have embedded messages as the value.
-pub type MessageFieldDecoder<T, D> = FieldDecoder<T, EmbeddedMessageDecoder<D>>;
+pub type MessageFieldDecoder<F, D> = FieldDecoder<F, EmbeddedMessageDecoder<D>>;
 
 /// Decoder for repeated fields that have embedded messages as the value.
-pub type RepeatedMessageFieldDecoder<T, V, E> =
-    RepeatedFieldDecoder<T, V, EmbeddedMessageDecoder<E>>;
+pub type RepeatedMessageFieldDecoder<F, V, E> =
+    RepeatedFieldDecoder<F, V, EmbeddedMessageDecoder<E>>;
 
 /// Encoder for fields that have embedded messages as the value.
-pub type MessageFieldEncoder<T, E> = FieldEncoder<T, EmbeddedMessageEncoder<E>>;
+pub type MessageFieldEncoder<F, E> = FieldEncoder<F, EmbeddedMessageEncoder<E>>;
 
 /// Encoder for repeated fields that have embedded messages as the value.
-pub type RepeatedMessageFieldEncoder<T, V, E> =
-    RepeatedFieldEncoder<T, V, EmbeddedMessageEncoder<E>>;
+pub type RepeatedMessageFieldEncoder<F, V, E> =
+    RepeatedFieldEncoder<F, V, EmbeddedMessageEncoder<E>>;
 
 /// This trait allows for decoding message fields.
 pub trait FieldDecode {
@@ -38,7 +54,7 @@ pub trait FieldDecode {
     /// Tries to start decoding a field.
     ///
     /// If `tag` is not a target of the decoder, `Ok(false)` will be returned.
-    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool>;
+    fn start_decoding(&mut self, tag: Tag) -> Result<bool>;
 
     /// Decodes the given bytes.
     ///
@@ -72,34 +88,34 @@ pub trait OneofFieldEncode: FieldEncode {}
 
 /// Decoder for required fields.
 #[derive(Debug)]
-pub struct FieldDecoder<T, D: ValueDecode> {
-    tag: T,
-    decoder: D,
-    value: Option<D::Item>,
+pub struct FieldDecoder<F, D: ValueDecode> {
+    num: F,
+    value: D,
+    decoded: Option<D::Item>,
     is_decoding: bool,
 }
-impl<T, D: ValueDecode> FieldDecoder<T, D> {
+impl<F, D: ValueDecode> FieldDecoder<F, D> {
     /// Makes a new `FieldDecoder` instance.
-    pub fn new(tag: T, value_decoder: D) -> Self {
+    pub fn new(field_num: F, value_decoder: D) -> Self {
         FieldDecoder {
-            tag,
-            decoder: value_decoder,
-            value: None,
+            num: field_num,
+            value: value_decoder,
+            decoded: None,
             is_decoding: false,
         }
     }
 }
-impl<T, D> FieldDecode for FieldDecoder<T, D>
+impl<F, D> FieldDecode for FieldDecoder<F, D>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     D: ValueDecode,
 {
     type Item = D::Item;
 
-    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
-        if self.tag.into() == tag {
+    fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
+        if self.num.into() == tag.field_num {
             track_assert!(!self.is_decoding, ErrorKind::Other);
-            track_assert_eq!(self.decoder.wire_type(), wire_type, ErrorKind::InvalidInput; tag);
+            track_assert_eq!(self.value.wire_type(), tag.wire_type, ErrorKind::InvalidInput; tag);
             self.is_decoding = true;
             Ok(true)
         } else {
@@ -108,13 +124,13 @@ where
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        let (size, item) = track!(self.decoder.decode(buf, eos); self.tag.into())?;
+        let (size, item) = track!(self.value.decode(buf, eos); self.num.into())?;
         if let Some(new) = item {
             self.is_decoding = false;
-            if self.value.is_none() {
-                self.value = Some(new);
+            if self.decoded.is_none() {
+                self.decoded = Some(new);
             } else {
-                self.value.as_mut().map(|old| D::merge_values(old, new));
+                self.decoded.as_mut().map(|old| D::merge_values(old, new));
             }
         }
         Ok(size)
@@ -126,39 +142,39 @@ where
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
         track_assert!(!self.is_decoding, ErrorKind::Other);
-        let value = track_assert_some!(
-            self.value.take(),
+        let v = track_assert_some!(
+            self.decoded.take(),
             ErrorKind::InvalidInput,
             "Missing required field: {:?}",
-            self.tag.into()
+            self.num.into()
         );
-        Ok(value)
+        Ok(v)
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        self.decoder.requiring_bytes()
+        self.value.requiring_bytes()
     }
 
     fn merge_fields(old: &mut Self::Item, new: Self::Item) {
         D::merge_values(old, new)
     }
 }
-impl<T, D> OneofFieldDecode for FieldDecoder<T, D>
+impl<F, D> OneofFieldDecode for FieldDecoder<F, D>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     D: ValueDecode,
 {
 }
-impl<T, D> Default for FieldDecoder<T, D>
+impl<F, D> Default for FieldDecoder<F, D>
 where
-    T: Default,
+    F: Default,
     D: Default + ValueDecode,
 {
     fn default() -> Self {
         FieldDecoder {
-            tag: T::default(),
-            decoder: D::default(),
-            value: None,
+            num: F::default(),
+            value: D::default(),
+            decoded: None,
             is_decoding: false,
         }
     }
@@ -166,22 +182,22 @@ where
 
 /// Decoder for optional fields.
 #[derive(Default)]
-pub struct OptionalFieldDecoder<T, D: OptionalValueDecode>(FieldDecoder<T, D>);
-impl<T, D: OptionalValueDecode> OptionalFieldDecoder<T, D> {
+pub struct OptionalFieldDecoder<F, D: OptionalValueDecode>(FieldDecoder<F, D>);
+impl<F, D: OptionalValueDecode> OptionalFieldDecoder<F, D> {
     /// Makes a new `OptionalFieldDecoder` instance.
-    pub fn new(tag: T, value_decoder: D) -> Self {
-        OptionalFieldDecoder(FieldDecoder::new(tag, value_decoder))
+    pub fn new(field_num: F, value_decoder: D) -> Self {
+        OptionalFieldDecoder(FieldDecoder::new(field_num, value_decoder))
     }
 }
-impl<T, D> FieldDecode for OptionalFieldDecoder<T, D>
+impl<F, D> FieldDecode for OptionalFieldDecoder<F, D>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     D: OptionalValueDecode,
 {
     type Item = D::Optional;
 
-    fn start_decoding(&mut self, tag: Tag, wire_type: WireType) -> Result<bool> {
-        track!(self.0.start_decoding(tag, wire_type))
+    fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
+        track!(self.0.start_decoding(tag))
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
@@ -194,7 +210,7 @@ where
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
         track_assert!(!self.is_decoding(), ErrorKind::Other);
-        if let Some(value) = self.0.value.take() {
+        if let Some(value) = self.0.decoded.take() {
             Ok(value.into())
         } else {
             Ok(Default::default())
@@ -209,9 +225,9 @@ where
         D::merge_optional_values(old, new)
     }
 }
-impl<T, D> fmt::Debug for OptionalFieldDecoder<T, D>
+impl<F, D> fmt::Debug for OptionalFieldDecoder<F, D>
 where
-    T: fmt::Debug,
+    F: fmt::Debug,
     D: fmt::Debug + OptionalValueDecode,
     D::Item: fmt::Debug,
 {
@@ -234,8 +250,8 @@ impl UnknownFieldDecoder {
 impl FieldDecode for UnknownFieldDecoder {
     type Item = ();
 
-    fn start_decoding(&mut self, _tag: Tag, wire_type: WireType) -> Result<bool> {
-        self.0 = match wire_type {
+    fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
+        self.0 = match tag.wire_type {
             WireType::Varint => UnknownFieldDecoderInner::Varint(Default::default()),
             WireType::Bit32 => UnknownFieldDecoderInner::Bit32(Default::default()),
             WireType::Bit64 => UnknownFieldDecoderInner::Bit64(Default::default()),
@@ -310,16 +326,16 @@ enum UnknownFieldDecoderInner {
 
 /// Encoder for optional fields.
 #[derive(Debug, Default)]
-pub struct OptionalFieldEncoder<T, E>(FieldEncoder<T, E>);
-impl<T, E: OptionalValueEncode> OptionalFieldEncoder<T, E> {
+pub struct OptionalFieldEncoder<F, E>(FieldEncoder<F, E>);
+impl<F, E: OptionalValueEncode> OptionalFieldEncoder<F, E> {
     /// Makes a new `OptionalFieldEncoder` instance.
-    pub fn new(tag: T, value_encoder: E) -> Self {
-        OptionalFieldEncoder(FieldEncoder::new(tag, value_encoder))
+    pub fn new(field_num: F, value_encoder: E) -> Self {
+        OptionalFieldEncoder(FieldEncoder::new(field_num, value_encoder))
     }
 }
-impl<T, E> Encode for OptionalFieldEncoder<T, E>
+impl<F, E> Encode for OptionalFieldEncoder<F, E>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     E: OptionalValueEncode,
 {
     type Item = E::Optional;
@@ -331,8 +347,8 @@ where
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
         track!(self.0.value.start_encoding_if_needed(item))?;
         if !self.0.value.is_idle() {
-            let tag_and_type = (self.0.tag.into(), self.0.value.wire_type());
-            track!(self.0.tag_and_type.start_encoding(tag_and_type))?;
+            let tag = Tag::from((self.0.num.into(), self.0.value.wire_type()));
+            track!(self.0.tag.start_encoding(tag))?;
         }
         Ok(())
     }
@@ -345,59 +361,59 @@ where
         self.0.requiring_bytes()
     }
 }
-impl<T, E> ExactBytesEncode for OptionalFieldEncoder<T, E>
+impl<F, E> ExactBytesEncode for OptionalFieldEncoder<F, E>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     E: ExactBytesEncode + OptionalValueEncode,
 {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
     }
 }
-impl<T, E> FieldEncode for OptionalFieldEncoder<T, E>
+impl<F, E> FieldEncode for OptionalFieldEncoder<F, E>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     E: OptionalValueEncode,
 {
 }
 
 /// Encoder for required fields.
 #[derive(Debug, Default)]
-pub struct FieldEncoder<T, E> {
-    tag: T,
-    tag_and_type: TagAndTypeEncoder,
+pub struct FieldEncoder<F, E> {
+    num: F,
+    tag: TagEncoder,
     value: E,
 }
-impl<T, E> FieldEncoder<T, E>
+impl<F, E> FieldEncoder<F, E>
 where
     E: ValueEncode,
 {
     /// Makes a new `FieldEncoder` instance.
-    pub fn new(tag: T, value_encoder: E) -> Self {
+    pub fn new(field_num: F, value_encoder: E) -> Self {
         FieldEncoder {
-            tag,
-            tag_and_type: TagAndTypeEncoder::new(),
+            num: field_num,
+            tag: TagEncoder::new(),
             value: value_encoder,
         }
     }
 }
-impl<T, E> Encode for FieldEncoder<T, E>
+impl<F, E> Encode for FieldEncoder<F, E>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     E: ValueEncode,
 {
     type Item = E::Item;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         let mut offset = 0;
-        bytecodec_try_encode!(self.tag_and_type, offset, buf, eos);
+        bytecodec_try_encode!(self.tag, offset, buf, eos);
         bytecodec_try_encode!(self.value, offset, buf, eos);
         Ok(offset)
     }
 
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-        let tag_and_type = (self.tag.into(), self.value.wire_type());
-        track!(self.tag_and_type.start_encoding(tag_and_type))?;
+        let tag = Tag::from((self.num.into(), self.value.wire_type()));
+        track!(self.tag.start_encoding(tag))?;
         track!(self.value.start_encoding(item))?;
         Ok(())
     }
@@ -407,23 +423,23 @@ where
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        self.tag_and_type
+        self.tag
             .requiring_bytes()
             .add_for_encoding(self.value.requiring_bytes())
     }
 }
-impl<T, E> ExactBytesEncode for FieldEncoder<T, E>
+impl<F, E> ExactBytesEncode for FieldEncoder<F, E>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     E: ExactBytesEncode + ValueEncode,
 {
     fn exact_requiring_bytes(&self) -> u64 {
-        self.tag_and_type.exact_requiring_bytes() + self.value.exact_requiring_bytes()
+        self.tag.exact_requiring_bytes() + self.value.exact_requiring_bytes()
     }
 }
-impl<T, E> FieldEncode for FieldEncoder<T, E>
+impl<F, E> FieldEncode for FieldEncoder<F, E>
 where
-    T: Copy + Into<Tag>,
+    F: Copy + Into<FieldNum>,
     E: ValueEncode,
 {
 }
@@ -435,7 +451,6 @@ mod test {
 
     use super::*;
     use scalar::Fixed32Encoder;
-    use tag::Tag1;
 
     macro_rules! assert_encode {
         ($encoder:ty, $value:expr, $bytes:expr) => {
@@ -448,6 +463,6 @@ mod test {
 
     #[test]
     fn field_encoder_works() {
-        assert_encode!(FieldEncoder<Tag1, Fixed32Encoder>, 123, [0x0d, 0x7b, 0x00, 0x00, 0x00]);
+        assert_encode!(FieldEncoder<num::F1, Fixed32Encoder>, 123, [0x0d, 0x7b, 0x00, 0x00, 0x00]);
     }
 }

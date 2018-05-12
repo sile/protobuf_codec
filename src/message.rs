@@ -4,7 +4,7 @@ use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
 use value::{OptionalValueDecode, ValueDecode, ValueEncode};
-use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagAndTypeDecoder, WireType};
+use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagDecoder, WireType};
 
 /// This trait allows for decoding messages.
 pub trait MessageDecode: Decode {
@@ -19,7 +19,7 @@ impl<M: MessageEncode> MessageEncode for PreEncode<M> {}
 /// Decoder for messages.
 #[derive(Debug, Default)]
 pub struct MessageDecoder<F> {
-    tag_and_type: TagAndTypeDecoder,
+    tag: TagDecoder,
     field: F,
     unknown_field: UnknownFieldDecoder,
 }
@@ -27,7 +27,7 @@ impl<F: FieldDecode> MessageDecoder<F> {
     /// Makes a new `MessageDecoder` instance.
     pub fn new(field_decoder: F) -> Self {
         MessageDecoder {
-            tag_and_type: TagAndTypeDecoder::default(),
+            tag: TagDecoder::default(),
             field: field_decoder,
             unknown_field: UnknownFieldDecoder::default(),
         }
@@ -52,17 +52,17 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
                     return Ok((offset, None));
                 }
             } else {
-                let (size, item) = track!(self.tag_and_type.decode(&buf[offset..], eos))?;
+                let (size, item) = track!(self.tag.decode(&buf[offset..], eos))?;
                 offset += size;
-                if let Some((tag, wire_type)) = item {
-                    if !track!(self.field.start_decoding(tag, wire_type))? {
-                        track!(self.unknown_field.start_decoding(tag, wire_type))?;
+                if let Some(tag) = item {
+                    if !track!(self.field.start_decoding(tag))? {
+                        track!(self.unknown_field.start_decoding(tag))?;
                     }
                 }
             }
         }
         if eos.is_reached() {
-            let _ = track!(self.tag_and_type.decode(&[][..], eos))?; // Unexpected EOS check
+            let _ = track!(self.tag.decode(&[][..], eos))?; // Unexpected EOS check
             let v = track!(self.field.finish_decoding())?;
             let _ = track!(self.unknown_field.finish_decoding())?;
             Ok((offset, Some(v)))
@@ -72,7 +72,7 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        self.tag_and_type
+        self.tag
             .requiring_bytes()
             .add_for_decoding(self.field.requiring_bytes())
             .add_for_decoding(self.unknown_field.requiring_bytes())

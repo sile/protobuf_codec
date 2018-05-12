@@ -1,4 +1,3 @@
-//! Traits for representing encoders and decoders of field values.
 use bytecodec::{Decode, Encode, ExactBytesEncode, Result};
 
 use wire::WireType;
