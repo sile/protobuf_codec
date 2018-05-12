@@ -16,7 +16,7 @@ Examples
 
 An encoder/decoder for `SearchRequest` message defined in the [Language Guide][proto3].
 
-```
+```rust
 extern crate bytecodec;
 extern crate protobuf_codec;
 
