@@ -78,6 +78,7 @@ macro_rules! impl_newtype_encode {
         impl OptionalValueEncode for $encoder {
             type Optional = $item;
 
+            #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
             fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
                 if item != Default::default() {
                     track!(self.start_encoding(item))?;
@@ -95,7 +96,7 @@ macro_rules! impl_varint_decode {
 
             fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
                 let (size, item) = track!(self.0.decode(buf, eos))?;
-                let item = item.map(Self::from_varint);
+                let item = item.map(Self::value_from_varint);
                 Ok((size, item))
             }
 
@@ -132,7 +133,7 @@ macro_rules! impl_varint_encode {
             }
 
             fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
-                track!(self.0.start_encoding(Self::to_varint(item)))
+                track!(self.0.start_encoding(Self::value_to_varint(item)))
             }
 
             fn is_idle(&self) -> bool {
@@ -327,7 +328,7 @@ impl BoolDecoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> bool {
+    fn value_from_varint(n: u64) -> bool {
         n != 0
     }
 }
@@ -344,7 +345,7 @@ impl BoolEncoder {
         Self::default()
     }
 
-    fn to_varint(n: bool) -> u64 {
+    fn value_to_varint(n: bool) -> u64 {
         n as u64
     }
 }
@@ -361,7 +362,7 @@ impl Int32Decoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> i32 {
+    fn value_from_varint(n: u64) -> i32 {
         n as i32
     }
 }
@@ -378,7 +379,7 @@ impl Int32Encoder {
         Self::default()
     }
 
-    fn to_varint(n: i32) -> u64 {
+    fn value_to_varint(n: i32) -> u64 {
         n as u64
     }
 }
@@ -395,7 +396,7 @@ impl Int64Decoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> i64 {
+    fn value_from_varint(n: u64) -> i64 {
         n as i64
     }
 }
@@ -412,7 +413,7 @@ impl Int64Encoder {
         Self::default()
     }
 
-    fn to_varint(n: i64) -> u64 {
+    fn value_to_varint(n: i64) -> u64 {
         n as u64
     }
 }
@@ -429,7 +430,7 @@ impl Uint32Decoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> u32 {
+    fn value_from_varint(n: u64) -> u32 {
         n as u32
     }
 }
@@ -446,8 +447,8 @@ impl Uint32Encoder {
         Self::default()
     }
 
-    fn to_varint(n: u32) -> u64 {
-        n as u64
+    fn value_to_varint(n: u32) -> u64 {
+        u64::from(n)
     }
 }
 impl_varint_encode!(Uint32Encoder, u32);
@@ -463,7 +464,7 @@ impl Uint64Decoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> u64 {
+    fn value_from_varint(n: u64) -> u64 {
         n
     }
 }
@@ -480,7 +481,7 @@ impl Uint64Encoder {
         Self::default()
     }
 
-    fn to_varint(n: u64) -> u64 {
+    fn value_to_varint(n: u64) -> u64 {
         n
     }
 }
@@ -497,7 +498,7 @@ impl Sint32Decoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> i32 {
+    fn value_from_varint(n: u64) -> i32 {
         let n = n as i32;
         (n >> 1) ^ ((n << 31) >> 31)
     }
@@ -515,7 +516,7 @@ impl Sint32Encoder {
         Self::default()
     }
 
-    fn to_varint(n: i32) -> u64 {
+    fn value_to_varint(n: i32) -> u64 {
         ((n << 1) ^ (n >> 31)) as u64
     }
 }
@@ -532,7 +533,7 @@ impl Sint64Decoder {
         Self::default()
     }
 
-    fn from_varint(n: u64) -> i64 {
+    fn value_from_varint(n: u64) -> i64 {
         let n = n as i64;
         (n >> 1) ^ ((n << 63) >> 63)
     }
@@ -550,7 +551,7 @@ impl Sint64Encoder {
         Self::default()
     }
 
-    fn to_varint(n: i64) -> u64 {
+    fn value_to_varint(n: i64) -> u64 {
         ((n << 1) ^ (n >> 63)) as u64
     }
 }

@@ -55,7 +55,8 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
                 let (size, item) = track!(self.tag.decode(&buf[offset..], eos))?;
                 offset += size;
                 if let Some(tag) = item {
-                    if !track!(self.field.start_decoding(tag))? {
+                    let started = track!(self.field.start_decoding(tag))?;
+                    if !started {
                         track!(self.unknown_field.start_decoding(tag))?;
                     }
                 }
@@ -64,7 +65,7 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
         if eos.is_reached() {
             let _ = track!(self.tag.decode(&[][..], eos))?; // Unexpected EOS check
             let v = track!(self.field.finish_decoding())?;
-            let _ = track!(self.unknown_field.finish_decoding())?;
+            track!(self.unknown_field.finish_decoding())?;
             Ok((offset, Some(v)))
         } else {
             Ok((offset, None))

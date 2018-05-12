@@ -130,7 +130,8 @@ where
             if self.decoded.is_none() {
                 self.decoded = Some(new);
             } else {
-                self.decoded.as_mut().map(|old| D::merge_values(old, new));
+                let old = self.decoded.as_mut().expect("Never fails");
+                D::merge_values(old, new);
             }
         }
         Ok(size)

@@ -325,6 +325,8 @@ where
     }
 }
 
+type MapMessageDecoder<K, V> = MessageDecoder<Fields<(FieldDecoder<F1, K>, FieldDecoder<F2, V>)>>;
+
 /// Decoder for map fields.
 #[derive(Default)]
 pub struct MapFieldDecoder<F, M, K, V>
@@ -332,11 +334,7 @@ where
     K: MapKeyDecode,
     V: ValueDecode,
 {
-    inner: RepeatedMessageFieldDecoder<
-        F,
-        M,
-        MessageDecoder<Fields<(FieldDecoder<F1, K>, FieldDecoder<F2, V>)>>,
-    >,
+    inner: RepeatedMessageFieldDecoder<F, M, MapMessageDecoder<K, V>>,
 }
 impl<F, M: Default, K: MapKeyDecode, V: ValueDecode> MapFieldDecoder<F, M, K, V> {
     /// Makes a new `MapFieldDecoder` instance.
@@ -445,7 +443,7 @@ where
         let tag = Tag::from((self.num.into(), self.bytes.wire_type()));
         track!(self.tag.start_encoding(tag))?;
         let mut buf = Vec::new();
-        for v in item.into_iter() {
+        for v in item {
             track!(self.value.start_encoding(v))?;
 
             let eos = Eos::new(false);
@@ -484,14 +482,12 @@ where
 {
 }
 
+type MapMessageEncoder<K, V> = MessageEncoder<Fields<(FieldEncoder<F1, K>, FieldEncoder<F2, V>)>>;
+
 /// Encoder for map fields.
 #[derive(Default)]
 pub struct MapFieldEncoder<F, M: IntoIterator, K, V> {
-    inner: RepeatedMessageFieldEncoder<
-        F,
-        M,
-        MessageEncoder<Fields<(FieldEncoder<F1, K>, FieldEncoder<F2, V>)>>,
-    >,
+    inner: RepeatedMessageFieldEncoder<F, M, MapMessageEncoder<K, V>>,
 }
 impl<F, M, K, V> MapFieldEncoder<F, M, K, V>
 where
