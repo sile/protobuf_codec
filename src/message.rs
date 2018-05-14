@@ -1,6 +1,7 @@
 //! Encoders, decoders and traits for messages.
-use bytecodec::combinator::PreEncode;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use bytecodec::combinator::{Map, MapErr, MapFrom, PreEncode, TryMap, TryMapFrom};
+use bytecodec::{ByteCount, Decode, Encode, Eos, Error, ErrorKind, ExactBytesEncode, Result};
+use std;
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
 use value::{OptionalValueDecode, ValueDecode, ValueEncode};
@@ -11,10 +12,59 @@ pub trait MessageDecode: Decode {
     /// Merges duplicate messages.
     fn merge_messages(old: &mut Self::Item, new: Self::Item);
 }
+impl<M, T, F> MessageDecode for Map<M, T, F>
+where
+    M: MessageDecode,
+    F: Fn(M::Item) -> T,
+{
+    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
+        *old = new;
+    }
+}
+impl<M, F, T, E> MessageDecode for TryMap<M, F, T, E>
+where
+    M: MessageDecode,
+    F: Fn(M::Item) -> std::result::Result<T, E>,
+    Error: From<E>,
+{
+    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
+        *old = new;
+    }
+}
+impl<M, F, E> MessageDecode for MapErr<M, F, E>
+where
+    M: MessageDecode,
+    F: Fn(Error) -> E,
+    Error: From<E>,
+{
+    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
+        M::merge_messages(old, new);
+    }
+}
 
 /// This trait allows for encoding messages.
 pub trait MessageEncode: Encode {}
 impl<M: MessageEncode> MessageEncode for PreEncode<M> {}
+impl<M, T, F> MessageEncode for MapFrom<M, T, F>
+where
+    M: MessageEncode,
+    F: Fn(T) -> M::Item,
+{
+}
+impl<M, T, E, F> MessageEncode for TryMapFrom<M, T, E, F>
+where
+    M: MessageEncode,
+    F: Fn(T) -> std::result::Result<M::Item, E>,
+    Error: From<E>,
+{
+}
+impl<M, F, E> MessageEncode for MapErr<M, F, E>
+where
+    M: MessageEncode,
+    F: Fn(Error) -> E,
+    Error: From<E>,
+{
+}
 
 /// Decoder for messages.
 #[derive(Debug, Default)]
