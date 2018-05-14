@@ -65,6 +65,9 @@ extern crate bytecodec;
 #[macro_use]
 extern crate trackable;
 
+#[macro_use]
+mod macros;
+
 pub mod field;
 pub mod message;
 pub mod scalar;
