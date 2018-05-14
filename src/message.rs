@@ -4,7 +4,7 @@ use bytecodec::{ByteCount, Decode, Encode, Eos, Error, ErrorKind, ExactBytesEnco
 use std;
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
-use value::{OptionalValueDecode, ValueDecode, ValueEncode};
+use value::{OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagDecoder, WireType};
 
 /// This trait allows for decoding messages.
@@ -268,5 +268,16 @@ impl<M: MessageEncode + ExactBytesEncode> ExactBytesEncode for EmbeddedMessageEn
 impl<M: MessageEncode + ExactBytesEncode> ValueEncode for EmbeddedMessageEncoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
+    }
+}
+impl<M: MessageEncode + ExactBytesEncode> OptionalValueEncode for EmbeddedMessageEncoder<M> {
+    type Optional = Option<M::Item>;
+
+    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
+        if let Some(item) = item {
+            track!(self.message.start_encoding(item))
+        } else {
+            Ok(())
+        }
     }
 }

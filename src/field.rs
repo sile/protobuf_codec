@@ -35,12 +35,18 @@ use wire::{LengthDelimitedDecoder, Tag, TagEncoder, VarintDecoder, WireType};
 /// Decoder for fields that have embedded messages as the value.
 pub type MessageFieldDecoder<F, D> = FieldDecoder<F, EmbeddedMessageDecoder<D>>;
 
+/// Decoder for optional fields that have embedded messages as the value.
+pub type OptionalMessageFieldDecoder<F, D> = OptionalFieldDecoder<F, EmbeddedMessageDecoder<D>>;
+
 /// Decoder for repeated fields that have embedded messages as the value.
 pub type RepeatedMessageFieldDecoder<F, V, E> =
     RepeatedFieldDecoder<F, V, EmbeddedMessageDecoder<E>>;
 
 /// Encoder for fields that have embedded messages as the value.
 pub type MessageFieldEncoder<F, E> = FieldEncoder<F, EmbeddedMessageEncoder<E>>;
+
+/// Encoder for optional fields that have embedded messages as the value.
+pub type OptionalMessageFieldEncoder<F, E> = OptionalFieldEncoder<F, EmbeddedMessageEncoder<E>>;
 
 /// Encoder for repeated fields that have embedded messages as the value.
 pub type RepeatedMessageFieldEncoder<F, V, E> =
