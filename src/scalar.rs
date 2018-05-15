@@ -80,7 +80,7 @@ macro_rules! impl_newtype_encode {
 
             #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
             fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-                if item != Default::default() {
+                if item != Self::Item::default() {
                     track!(self.start_encoding(item))?;
                 }
                 Ok(())
@@ -158,7 +158,7 @@ macro_rules! impl_varint_encode {
             type Optional = $item;
 
             fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-                if item != Default::default() {
+                if item != Self::Item::default() {
                     track!(self.start_encoding(item))?;
                 }
                 Ok(())

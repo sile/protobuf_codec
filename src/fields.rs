@@ -70,7 +70,7 @@ impl_field_decode!([A, B, C, D, E, F, G], [0, 1, 2, 3, 4, 5, 6]);
 impl_field_decode!([A, B, C, D, E, F, G, H], [0, 1, 2, 3, 4, 5, 6, 7]);
 
 macro_rules! impl_field_encode {
-    ([$($f:ident),*], [$($i:tt),*], $last:tt) => {
+    ([$($f:ident),*], [$($i:tt),*]) => {
         impl<$($f),*> Encode for Fields<($($f),*,)>
         where
             $($f: FieldEncode),*
@@ -94,7 +94,7 @@ macro_rules! impl_field_encode {
             }
 
             fn is_idle(&self) -> bool {
-                self.fields.$last.is_idle()
+                $(self.fields.$i.is_idle())&&*
             }
 
             fn requiring_bytes(&self) -> ByteCount {
@@ -117,11 +117,11 @@ macro_rules! impl_field_encode {
     };
 }
 
-impl_field_encode!([A], [0], 0);
-impl_field_encode!([A, B], [0, 1], 1);
-impl_field_encode!([A, B, C], [0, 1, 2], 2);
-impl_field_encode!([A, B, C, D], [0, 1, 2, 3], 3);
-impl_field_encode!([A, B, C, D, E], [0, 1, 2, 3, 4], 4);
-impl_field_encode!([A, B, C, D, E, F], [0, 1, 2, 3, 4, 5], 5);
-impl_field_encode!([A, B, C, D, E, F, G], [0, 1, 2, 3, 4, 5, 6], 6);
-impl_field_encode!([A, B, C, D, E, F, G, H], [0, 1, 2, 3, 4, 5, 6, 7], 7);
+impl_field_encode!([A], [0]);
+impl_field_encode!([A, B], [0, 1]);
+impl_field_encode!([A, B, C], [0, 1, 2]);
+impl_field_encode!([A, B, C, D], [0, 1, 2, 3]);
+impl_field_encode!([A, B, C, D, E], [0, 1, 2, 3, 4]);
+impl_field_encode!([A, B, C, D, E, F], [0, 1, 2, 3, 4, 5]);
+impl_field_encode!([A, B, C, D, E, F, G], [0, 1, 2, 3, 4, 5, 6]);
+impl_field_encode!([A, B, C, D, E, F, G, H], [0, 1, 2, 3, 4, 5, 6, 7]);
