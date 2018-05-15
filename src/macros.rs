@@ -27,6 +27,9 @@
 /// ```
 #[macro_export]
 macro_rules! protobuf_message_decoder {
+    () => {
+        $crate::message::MessageDecoder::new($crate::field::Fields::new(()))
+    };
     ($($field:tt),*) => {
         $crate::message::MessageDecoder::new(
             $crate::field::Fields::new(($(protobuf_message_field_decoder! $field),*,))
@@ -132,6 +135,9 @@ macro_rules! protobuf_message_oneof_field_decoder {
 /// ```
 #[macro_export]
 macro_rules! protobuf_message_encoder {
+    () => {
+        $crate::message::MessageEncoder::new($crate::field::Fields::new(()))
+    };
     ($($field:tt),*) => {
         $crate::message::MessageEncoder::new(
             $crate::field::Fields::new(($(protobuf_message_field_encoder! $field),*,))
@@ -279,7 +285,7 @@ mod test {
             (F1, m0, Vec<(i32, i32)>, repeated_message),
             (F2, Int32Encoder::new(), Vec<i32>, repeated)
         ];
-        let m2 = protobuf_message_encoder![
+        let mut m2 = protobuf_message_encoder![
             (F1, m1, required_unsized_message),
             (F2, Int32Encoder::new(), Vec<i32>, packed),
             (oneof, (F3, Int32Encoder::new()), (F4, Uint64Encoder::new()))
@@ -289,9 +295,8 @@ mod test {
         let v1 = (vec![v0], vec![3]);
         let v2 = (v1, vec![4], Branch2::A(5));
 
-        let mut encoder = m2.pre_encode();
         assert_eq!(
-            encoder.encode_into_bytes(v2).unwrap(),
+            m2.encode_into_bytes(v2).unwrap(),
             [10, 8, 10, 4, 8, 1, 16, 2, 16, 3, 18, 1, 4, 24, 5]
         );
     }
@@ -301,7 +306,7 @@ mod test {
         let mut encoder = protobuf_message_encoder!(
             (F1, StringEncoder::new(), repeated),
             (F2, Uint32Encoder::new())
-        ).pre_encode();
+        );
         assert_eq!(
             encoder.encode_into_bytes((vec!["foo"], 0)).unwrap(),
             [10, 3, 102, 111, 111]

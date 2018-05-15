@@ -16,6 +16,31 @@ impl<F> Fields<F> {
     }
 }
 
+impl FieldDecode for Fields<()> {
+    type Item = ();
+
+    fn start_decoding(&mut self, _tag: Tag) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn field_decode(&mut self, _buf: &[u8], _eos: Eos) -> Result<usize> {
+        track_panic!(ErrorKind::Other)
+    }
+
+    fn is_decoding(&self) -> bool {
+        false
+    }
+
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        Ok(())
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        ByteCount::Finite(0)
+    }
+
+    fn merge_fields(_old: &mut Self::Item, _new: Self::Item) {}
+}
 macro_rules! impl_field_decode {
     ([$($f:ident),*],[$($i:tt),*]) => {
         impl<$($f),*> FieldDecode for Fields<($($f),*,)>
@@ -69,6 +94,31 @@ impl_field_decode!([A, B, C, D, E, F], [0, 1, 2, 3, 4, 5]);
 impl_field_decode!([A, B, C, D, E, F, G], [0, 1, 2, 3, 4, 5, 6]);
 impl_field_decode!([A, B, C, D, E, F, G, H], [0, 1, 2, 3, 4, 5, 6, 7]);
 
+impl Encode for Fields<()> {
+    type Item = ();
+
+    fn encode(&mut self, _buf: &mut [u8], _eos: Eos) -> Result<usize> {
+        Ok(0)
+    }
+
+    fn start_encoding(&mut self, _item: Self::Item) -> Result<()> {
+        Ok(())
+    }
+
+    fn is_idle(&self) -> bool {
+        true
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        ByteCount::Finite(0)
+    }
+}
+impl ExactBytesEncode for Fields<()> {
+    fn exact_requiring_bytes(&self) -> u64 {
+        0
+    }
+}
+impl FieldEncode for Fields<()> {}
 macro_rules! impl_field_encode {
     ([$($f:ident),*], [$($i:tt),*]) => {
         impl<$($f),*> Encode for Fields<($($f),*,)>
