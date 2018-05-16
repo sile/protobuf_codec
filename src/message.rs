@@ -15,14 +15,14 @@ where
     F: Fn(M::Item) -> T,
 {
 }
-impl<M, F, T, E> MessageDecode for TryMap<M, F, T, E>
+impl<M, T, E, F> MessageDecode for TryMap<M, T, E, F>
 where
     M: MessageDecode,
     F: Fn(M::Item) -> std::result::Result<T, E>,
     Error: From<E>,
 {
 }
-impl<M, F, E> MessageDecode for MapErr<M, F, E>
+impl<M, E, F> MessageDecode for MapErr<M, E, F>
 where
     M: MessageDecode,
     F: Fn(Error) -> E,
@@ -46,7 +46,7 @@ where
     Error: From<E>,
 {
 }
-impl<M, F, E> MessageEncode for MapErr<M, F, E>
+impl<M, E, F> MessageEncode for MapErr<M, E, F>
 where
     M: MessageEncode,
     F: Fn(Error) -> E,
