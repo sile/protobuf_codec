@@ -8,18 +8,12 @@ use value::{OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagDecoder, WireType};
 
 /// This trait allows for decoding messages.
-pub trait MessageDecode: Decode {
-    /// Merges duplicate messages.
-    fn merge_messages(old: &mut Self::Item, new: Self::Item);
-}
+pub trait MessageDecode: Decode {}
 impl<M, T, F> MessageDecode for Map<M, T, F>
 where
     M: MessageDecode,
     F: Fn(M::Item) -> T,
 {
-    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
-        *old = new;
-    }
 }
 impl<M, F, T, E> MessageDecode for TryMap<M, F, T, E>
 where
@@ -27,9 +21,6 @@ where
     F: Fn(M::Item) -> std::result::Result<T, E>,
     Error: From<E>,
 {
-    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
-        *old = new;
-    }
 }
 impl<M, F, E> MessageDecode for MapErr<M, F, E>
 where
@@ -37,9 +28,6 @@ where
     F: Fn(Error) -> E,
     Error: From<E>,
 {
-    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
-        M::merge_messages(old, new);
-    }
 }
 
 /// This trait allows for encoding messages.
@@ -135,11 +123,7 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
             .add_for_decoding(self.unknown_field.requiring_bytes())
     }
 }
-impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {
-    fn merge_messages(old: &mut Self::Item, new: Self::Item) {
-        F::merge_fields(old, new)
-    }
-}
+impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {}
 
 /// Decoder for embedded messages.
 #[derive(Debug, Default)]
@@ -165,28 +149,9 @@ impl<M: MessageDecode> ValueDecode for EmbeddedMessageDecoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
-
-    fn merge_values(old: &mut Self::Item, new: Self::Item) {
-        M::merge_messages(old, new);
-    }
 }
 impl<M: MessageDecode> OptionalValueDecode for EmbeddedMessageDecoder<M> {
     type Optional = Option<M::Item>;
-
-    fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional) {
-        match (old.take(), new) {
-            (None, new) => {
-                *old = new;
-            }
-            (Some(v), None) => {
-                *old = Some(v);
-            }
-            (Some(mut v), Some(new)) => {
-                Self::merge_values(&mut v, new);
-                *old = Some(v);
-            }
-        }
-    }
 }
 
 /// Encoder for messages.

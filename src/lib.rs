@@ -1,5 +1,11 @@
 //! Encoders and decoders for [Protocol Buffers][protobuf] based on [bytecodec] crate.
 //!
+//! # Limitation
+//!
+//! The current version does not support to merge duplicate messages.
+//! Alghtough it is required by [The guide][encoding],
+//! `protobuf_codec` simply select the last message instance of the same singular field.
+//!
 //! # Examples
 //!
 //! An encoder/decoder for `SearchRequest` message defined in the [Language Guide][proto3].

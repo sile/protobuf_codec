@@ -38,8 +38,6 @@ impl FieldDecode for Fields<()> {
     fn requiring_bytes(&self) -> ByteCount {
         ByteCount::Finite(0)
     }
-
-    fn merge_fields(_old: &mut Self::Item, _new: Self::Item) {}
 }
 macro_rules! impl_field_decode {
     ([$($f:ident),*],[$($i:tt),*]) => {
@@ -76,10 +74,6 @@ macro_rules! impl_field_decode {
                     return self.fields.$i.requiring_bytes();
                 })*
                 ByteCount::Unknown
-            }
-
-            fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-                $($f::merge_fields(&mut old.$i, new.$i));*
             }
         }
     };

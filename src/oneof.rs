@@ -199,10 +199,6 @@ macro_rules! impl_field_decode {
                     _ => ByteCount::Unknown,
                 }
             }
-
-            fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-                *old = new;
-            }
         }
         impl<$($f),*> OneofFieldDecode for Oneof<($($f),*,)>
         where

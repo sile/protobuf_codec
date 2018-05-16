@@ -29,17 +29,9 @@ macro_rules! impl_newtype_decode {
             fn wire_type(&self) -> WireType {
                 WireType::$wire
             }
-
-            fn merge_values(old: &mut Self::Item, new: Self::Item) {
-                *old = new;
-            }
         }
         impl OptionalValueDecode for $decoder {
             type Optional = $item;
-
-            fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional) {
-                *old = new;
-            }
         }
     };
 }
@@ -108,17 +100,9 @@ macro_rules! impl_varint_decode {
             fn wire_type(&self) -> WireType {
                 WireType::Varint
             }
-
-            fn merge_values(old: &mut Self::Item, new: Self::Item) {
-                *old = new;
-            }
         }
         impl OptionalValueDecode for $decoder {
             type Optional = $item;
-
-            fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional) {
-                *old = new;
-            }
         }
     };
 }
@@ -612,10 +596,6 @@ impl<D: Decode> Decode for CustomBytesDecoder<D> {
 impl<D: Decode> ValueDecode for CustomBytesDecoder<D> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
-    }
-
-    fn merge_values(old: &mut Self::Item, new: Self::Item) {
-        *old = new;
     }
 }
 

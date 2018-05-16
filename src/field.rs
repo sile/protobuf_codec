@@ -78,9 +78,6 @@ pub trait FieldDecode {
 
     /// Returns the lower bound of the number of bytes needed to decode the next item.
     fn requiring_bytes(&self) -> ByteCount;
-
-    /// Merges duplicate field values.
-    fn merge_fields(old: &mut Self::Item, new: Self::Item);
 }
 
 /// This trait allows for decoding `Oneof` fields.
@@ -133,12 +130,7 @@ where
         let (size, item) = track!(self.value.decode(buf, eos); self.num.into())?;
         if let Some(new) = item {
             self.is_decoding = false;
-            if self.decoded.is_none() {
-                self.decoded = Some(new);
-            } else {
-                let old = self.decoded.as_mut().expect("Never fails");
-                D::merge_values(old, new);
-            }
+            self.decoded = Some(new);
         }
         Ok(size)
     }
@@ -160,10 +152,6 @@ where
 
     fn requiring_bytes(&self) -> ByteCount {
         self.value.requiring_bytes()
-    }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        D::merge_values(old, new)
     }
 }
 impl<F, D> OneofFieldDecode for FieldDecoder<F, D>
@@ -226,10 +214,6 @@ where
 
     fn requiring_bytes(&self) -> ByteCount {
         self.0.requiring_bytes()
-    }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        D::merge_optional_values(old, new)
     }
 }
 impl<F, D> fmt::Debug for OptionalFieldDecoder<F, D>
@@ -313,8 +297,6 @@ impl FieldDecode for UnknownFieldDecoder {
             UnknownFieldDecoderInner::LengthDelimited(ref d) => d.requiring_bytes(),
         }
     }
-
-    fn merge_fields(_: &mut Self::Item, _: Self::Item) {}
 }
 impl Default for UnknownFieldDecoder {
     fn default() -> Self {

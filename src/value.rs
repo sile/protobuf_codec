@@ -8,18 +8,12 @@ use wire::WireType;
 pub trait ValueDecode: Decode {
     /// Returns the wire type of the value.
     fn wire_type(&self) -> WireType;
-
-    /// Merges duplicate values.
-    fn merge_values(old: &mut Self::Item, new: Self::Item);
 }
 
 /// This trait allows for decoding optional field values.
 pub trait OptionalValueDecode: ValueDecode {
     /// The type of the optional field.
     type Optional: Default + From<Self::Item>;
-
-    /// Merges duplicate optional values.
-    fn merge_optional_values(old: &mut Self::Optional, new: Self::Optional);
 }
 
 /// This trait allows for encoding field values.

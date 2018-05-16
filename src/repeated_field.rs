@@ -72,10 +72,6 @@ where
     fn requiring_bytes(&self) -> ByteCount {
         self.decoder.requiring_bytes()
     }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        old.extend(new.into_iter());
-    }
 }
 
 /// Encoder for repeated fields.
@@ -230,10 +226,6 @@ where
             ByteCount::Finite(0)
         }
     }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        old.extend(new.into_iter());
-    }
 }
 
 /// Decoder for repeated numeric fields.
@@ -319,10 +311,6 @@ where
             ByteCount::Finite(0)
         }
     }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        old.extend(new.into_iter());
-    }
 }
 
 type MapMessageDecoder<K, V> = MessageDecoder<Fields<(FieldDecoder<F1, K>, FieldDecoder<F2, V>)>>;
@@ -376,10 +364,6 @@ where
 
     fn requiring_bytes(&self) -> ByteCount {
         self.inner.requiring_bytes()
-    }
-
-    fn merge_fields(old: &mut Self::Item, new: Self::Item) {
-        old.extend(new.into_iter());
     }
 }
 impl<F, M, K, V> fmt::Debug for MapFieldDecoder<F, M, K, V>
