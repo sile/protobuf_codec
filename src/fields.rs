@@ -1,5 +1,5 @@
 #![cfg_attr(feature = "cargo-clippy", allow(block_in_if_condition_stmt))]
-use bytecodec::{ByteCount, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Encode, Eos, ErrorKind, Result, SizedEncode};
 
 use field::{FieldDecode, FieldEncode};
 use wire::Tag;
@@ -107,7 +107,7 @@ impl Encode for Fields<()> {
         ByteCount::Finite(0)
     }
 }
-impl ExactBytesEncode for Fields<()> {
+impl SizedEncode for Fields<()> {
     fn exact_requiring_bytes(&self) -> u64 {
         0
     }
@@ -145,9 +145,9 @@ macro_rules! impl_field_encode {
                 ByteCount::Finite(0)$(.add_for_encoding(self.fields.$i.requiring_bytes()))*
             }
         }
-        impl<$($f),*> ExactBytesEncode for Fields<($($f),*,)>
+        impl<$($f),*> SizedEncode for Fields<($($f),*,)>
         where
-            $($f: FieldEncode + ExactBytesEncode),*
+            $($f: FieldEncode + SizedEncode),*
         {
             fn exact_requiring_bytes(&self) -> u64 {
                 0 $(+ self.fields.$i.exact_requiring_bytes())*

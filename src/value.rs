@@ -1,5 +1,5 @@
 use bytecodec::combinator::{Map, MapErr, MapFrom, TryMap, TryMapFrom};
-use bytecodec::{Decode, Encode, Error, ExactBytesEncode, Result};
+use bytecodec::{Decode, Encode, Error, Result, SizedEncode};
 use std;
 
 use wire::WireType;
@@ -225,7 +225,7 @@ where
 }
 
 /// This trait allows for encoding numeric values.
-pub trait NumericValueEncode: ValueEncode + ExactBytesEncode {}
+pub trait NumericValueEncode: ValueEncode + SizedEncode {}
 impl<V, T, F> NumericValueEncode for MapFrom<V, T, F>
 where
     V: NumericValueEncode,

@@ -1,5 +1,5 @@
 use bytecodec::combinator::Collect;
-use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result, SizedEncode};
 use std::fmt;
 use std::iter;
 use std::mem;
@@ -52,8 +52,9 @@ where
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        let (size, item) = track!(self.decoder.decode(buf, eos); self.num.into())?;
-        if let Some(value) = item {
+        let size = track!(self.decoder.decode(buf, eos); self.num.into())?;
+        if self.decoder.is_idle() {
+            let value = track!(self.decoder.finish_decoding())?;
             self.is_decoding = false;
             self.values.extend(iter::once(value));
         }
@@ -70,7 +71,11 @@ where
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        self.decoder.requiring_bytes()
+        if !self.is_decoding {
+            ByteCount::Finite(0)
+        } else {
+            self.decoder.requiring_bytes()
+        }
     }
 }
 
@@ -201,8 +206,9 @@ where
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
         track_assert!(self.is_decoding, ErrorKind::Other);
 
-        let (size, item) = track!(self.decoder.decode(buf, eos); self.num.into())?;
-        if let Some(values) = item {
+        let size = track!(self.decoder.decode(buf, eos); self.num.into())?;
+        if self.decoder.is_idle() {
+            let values = track!(self.decoder.finish_decoding())?;
             self.values.extend(values.into_iter());
             self.is_decoding = false;
         }
@@ -285,9 +291,9 @@ where
             Ok(size)
         } else {
             track_assert!(self.is_decoding, ErrorKind::Other);
-            let (size, item) =
-                track!(self.decoder.inner_mut().decode(buf, eos); self.decoder.num.into())?;
-            if let Some(value) = item {
+            let size = track!(self.decoder.inner_mut().decode(buf, eos); self.decoder.num.into())?;
+            if self.decoder.inner_mut().is_idle() {
+                let value = track!(self.decoder.inner_mut().finish_decoding())?;
                 self.decoder.values.extend(iter::once(value));
                 self.is_decoding = false;
             }
@@ -448,7 +454,7 @@ where
         ByteCount::Finite(self.exact_requiring_bytes())
     }
 }
-impl<F, V, E> ExactBytesEncode for PackedRepeatedFieldEncoder<F, V, E>
+impl<F, V, E> SizedEncode for PackedRepeatedFieldEncoder<F, V, E>
 where
     F: Copy + Into<FieldNum>,
     V: IntoIterator<Item = E::Item>,
@@ -477,8 +483,8 @@ impl<F, M, K, V> MapFieldEncoder<F, M, K, V>
 where
     F: Copy + Into<FieldNum>,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-    K: ExactBytesEncode + MapKeyEncode,
-    V: ExactBytesEncode + ValueEncode,
+    K: SizedEncode + MapKeyEncode,
+    V: SizedEncode + ValueEncode,
 {
     /// Makes a new `MapFieldEncoder` instance.
     pub fn new(field_num: F, key_encoder: K, value_encoder: V) -> Self {
@@ -496,8 +502,8 @@ impl<F, M, K, V> Encode for MapFieldEncoder<F, M, K, V>
 where
     F: Copy + Into<FieldNum>,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-    K: ExactBytesEncode + MapKeyEncode,
-    V: ExactBytesEncode + ValueEncode,
+    K: SizedEncode + MapKeyEncode,
+    V: SizedEncode + ValueEncode,
 {
     type Item = M;
 
@@ -521,8 +527,8 @@ impl<F, M, K, V> FieldEncode for MapFieldEncoder<F, M, K, V>
 where
     F: Copy + Into<FieldNum>,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-    K: ExactBytesEncode + MapKeyEncode,
-    V: ExactBytesEncode + ValueEncode,
+    K: SizedEncode + MapKeyEncode,
+    V: SizedEncode + ValueEncode,
 {
 }
 impl<F, M: IntoIterator, K, V> fmt::Debug for MapFieldEncoder<F, M, K, V> {

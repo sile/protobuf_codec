@@ -6,7 +6,7 @@ use bytecodec::bytes::{BytesEncoder as BytesEncoderInner, RemainingBytesDecoder,
 use bytecodec::fixnum::{F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, I32leDecoder,
                         I32leEncoder, I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder,
                         U64leDecoder, U64leEncoder};
-use bytecodec::{ByteCount, Decode, Encode, Eos, ExactBytesEncode, Result};
+use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
 
 use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode,
             OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
@@ -17,12 +17,20 @@ macro_rules! impl_newtype_decode {
         impl Decode for $decoder {
             type Item = $item;
 
-            fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+            fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
                 track!(self.0.decode(buf, eos))
+            }
+
+            fn finish_decoding(&mut self) -> Result<Self::Item> {
+                track!(self.0.finish_decoding())
             }
 
             fn requiring_bytes(&self) -> ByteCount {
                 self.0.requiring_bytes()
+            }
+
+            fn is_idle(&self) -> bool {
+                self.0.is_idle()
             }
         }
         impl ValueDecode for $decoder {
@@ -57,7 +65,7 @@ macro_rules! impl_newtype_encode {
                 self.0.requiring_bytes()
             }
         }
-        impl ExactBytesEncode for $encoder {
+        impl SizedEncode for $encoder {
             fn exact_requiring_bytes(&self) -> u64 {
                 self.0.exact_requiring_bytes()
             }
@@ -86,14 +94,20 @@ macro_rules! impl_varint_decode {
         impl Decode for $decoder {
             type Item = $item;
 
-            fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-                let (size, item) = track!(self.0.decode(buf, eos))?;
-                let item = item.map(Self::value_from_varint);
-                Ok((size, item))
+            fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+                track!(self.0.decode(buf, eos))
+            }
+
+            fn finish_decoding(&mut self) -> Result<Self::Item> {
+                track!(self.0.finish_decoding()).map(Self::value_from_varint)
             }
 
             fn requiring_bytes(&self) -> ByteCount {
                 self.0.requiring_bytes()
+            }
+
+            fn is_idle(&self) -> bool {
+                self.0.is_idle()
             }
         }
         impl ValueDecode for $decoder {
@@ -128,7 +142,7 @@ macro_rules! impl_varint_encode {
                 self.0.requiring_bytes()
             }
         }
-        impl ExactBytesEncode for $encoder {
+        impl SizedEncode for $encoder {
             fn exact_requiring_bytes(&self) -> u64 {
                 self.0.exact_requiring_bytes()
             }
@@ -585,12 +599,20 @@ impl<D: Decode> CustomBytesDecoder<D> {
 impl<D: Decode> Decode for CustomBytesDecoder<D> {
     type Item = D::Item;
 
-    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
         track!(self.0.decode(buf, eos))
+    }
+
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        track!(self.0.finish_decoding())
     }
 
     fn requiring_bytes(&self) -> ByteCount {
         self.0.requiring_bytes()
+    }
+
+    fn is_idle(&self) -> bool {
+        self.0.is_idle()
     }
 }
 impl<D: Decode> ValueDecode for CustomBytesDecoder<D> {
@@ -632,7 +654,7 @@ impl<B: AsRef<[u8]>> Encode for BytesEncoder<B> {
         self.0.requiring_bytes()
     }
 }
-impl<B: AsRef<[u8]>> ExactBytesEncode for BytesEncoder<B> {
+impl<B: AsRef<[u8]>> SizedEncode for BytesEncoder<B> {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
     }
@@ -659,7 +681,7 @@ impl<B: AsRef<[u8]>> OptionalValueEncode for BytesEncoder<B> {
 /// but it uses the encoder `E` for producing bytes instead of passing raw bytes.
 #[derive(Debug, Default)]
 pub struct CustomBytesEncoder<E>(LengthDelimitedEncoder<E>);
-impl<E: ExactBytesEncode> CustomBytesEncoder<E> {
+impl<E: SizedEncode> CustomBytesEncoder<E> {
     /// Makes a new `CustomBytesEncoder` instance.
     pub fn new(inner: E) -> Self {
         CustomBytesEncoder(LengthDelimitedEncoder::new(inner))
@@ -680,7 +702,7 @@ impl<E: ExactBytesEncode> CustomBytesEncoder<E> {
         self.0.into_inner()
     }
 }
-impl<E: ExactBytesEncode> Encode for CustomBytesEncoder<E> {
+impl<E: SizedEncode> Encode for CustomBytesEncoder<E> {
     type Item = E::Item;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
@@ -699,12 +721,12 @@ impl<E: ExactBytesEncode> Encode for CustomBytesEncoder<E> {
         self.0.requiring_bytes()
     }
 }
-impl<E: ExactBytesEncode> ExactBytesEncode for CustomBytesEncoder<E> {
+impl<E: SizedEncode> SizedEncode for CustomBytesEncoder<E> {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
     }
 }
-impl<E: ExactBytesEncode> ValueEncode for CustomBytesEncoder<E> {
+impl<E: SizedEncode> ValueEncode for CustomBytesEncoder<E> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
@@ -755,7 +777,7 @@ impl<S: AsRef<str>> Encode for StringEncoder<S> {
         self.0.requiring_bytes()
     }
 }
-impl<S: AsRef<str>> ExactBytesEncode for StringEncoder<S> {
+impl<S: AsRef<str>> SizedEncode for StringEncoder<S> {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
     }

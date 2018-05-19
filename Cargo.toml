@@ -15,5 +15,5 @@ travis-ci = {repository = "sile/protobuf_codec"}
 codecov = {repository = "sile/protobuf_codec"}
 
 [dependencies]
-bytecodec = "0.3"
+bytecodec = "0.4"
 trackable = "0.2"

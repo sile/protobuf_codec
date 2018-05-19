@@ -1,8 +1,7 @@
 //! Encoders, decoders and related components for message fields.
 use bytecodec::bytes::CopyableBytesDecoder;
-use bytecodec::combinator::SkipRemaining;
-use bytecodec::value::NullDecoder;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, ExactBytesEncode, Result};
+use bytecodec::padding::PaddingDecoder;
+use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 use std::fmt;
 
 pub use fields::Fields;
@@ -127,8 +126,9 @@ where
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        let (size, item) = track!(self.value.decode(buf, eos); self.num.into())?;
-        if let Some(new) = item {
+        let size = track!(self.value.decode(buf, eos); self.num.into())?;
+        if self.value.is_idle() {
+            let new = track!(self.value.finish_decoding())?;
             self.is_decoding = false;
             self.decoded = Some(new);
         }
@@ -151,7 +151,11 @@ where
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        self.value.requiring_bytes()
+        if self.is_decoding {
+            self.value.requiring_bytes()
+        } else {
+            ByteCount::Finite(0)
+        }
     }
 }
 impl<F, D> OneofFieldDecode for FieldDecoder<F, D>
@@ -254,25 +258,28 @@ impl FieldDecode for UnknownFieldDecoder {
     }
 
     fn field_decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        let (size, decoded) = match self.0 {
-            UnknownFieldDecoderInner::None => (0, false),
+        let mut offset = 0;
+        match self.0 {
+            UnknownFieldDecoderInner::None => {}
             UnknownFieldDecoderInner::Varint(ref mut d) => {
-                track!(d.decode(buf, eos)).map(|(n, i)| (n, i.is_some()))?
+                bytecodec_try_decode!(d, offset, buf, eos);
+                track!(d.finish_decoding())?;
             }
             UnknownFieldDecoderInner::Bit32(ref mut d) => {
-                track!(d.decode(buf, eos)).map(|(n, i)| (n, i.is_some()))?
+                bytecodec_try_decode!(d, offset, buf, eos);
+                track!(d.finish_decoding())?;
             }
             UnknownFieldDecoderInner::Bit64(ref mut d) => {
-                track!(d.decode(buf, eos)).map(|(n, i)| (n, i.is_some()))?
+                bytecodec_try_decode!(d, offset, buf, eos);
+                track!(d.finish_decoding())?;
             }
             UnknownFieldDecoderInner::LengthDelimited(ref mut d) => {
-                track!(d.decode(buf, eos)).map(|(n, i)| (n, i.is_some()))?
+                bytecodec_try_decode!(d, offset, buf, eos);
+                track!(d.finish_decoding())?;
             }
-        };
-        if decoded {
-            self.0 = UnknownFieldDecoderInner::None;
         }
-        Ok(size)
+        self.0 = UnknownFieldDecoderInner::None;
+        Ok(offset)
     }
 
     fn is_decoding(&self) -> bool {
@@ -310,7 +317,7 @@ enum UnknownFieldDecoderInner {
     Varint(VarintDecoder),
     Bit32(CopyableBytesDecoder<[u8; 4]>),
     Bit64(CopyableBytesDecoder<[u8; 8]>),
-    LengthDelimited(LengthDelimitedDecoder<SkipRemaining<NullDecoder>>),
+    LengthDelimited(LengthDelimitedDecoder<PaddingDecoder>),
 }
 
 /// Encoder for optional fields.
@@ -350,10 +357,10 @@ where
         self.0.requiring_bytes()
     }
 }
-impl<F, E> ExactBytesEncode for OptionalFieldEncoder<F, E>
+impl<F, E> SizedEncode for OptionalFieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
-    E: ExactBytesEncode + OptionalValueEncode,
+    E: SizedEncode + OptionalValueEncode,
 {
     fn exact_requiring_bytes(&self) -> u64 {
         self.0.exact_requiring_bytes()
@@ -417,10 +424,10 @@ where
             .add_for_encoding(self.value.requiring_bytes())
     }
 }
-impl<F, E> ExactBytesEncode for FieldEncoder<F, E>
+impl<F, E> SizedEncode for FieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
-    E: ExactBytesEncode + ValueEncode,
+    E: SizedEncode + ValueEncode,
 {
     fn exact_requiring_bytes(&self) -> u64 {
         self.tag.exact_requiring_bytes() + self.value.exact_requiring_bytes()
