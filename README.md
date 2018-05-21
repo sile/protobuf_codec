@@ -22,7 +22,7 @@ extern crate protobuf_codec;
 
 use bytecodec::EncodeExt;
 use bytecodec::io::{IoDecodeExt, IoEncodeExt};
-use protobuf_codec::field::{Fields, OptionalFieldDecoder, OptionalFieldEncoder};
+use protobuf_codec::field::{Fields, FieldDecoder, FieldEncoder, MaybeDefault};
 use protobuf_codec::field::num::{F1, F2, F3};
 use protobuf_codec::message::{MessageDecoder, MessageEncoder};
 use protobuf_codec::scalar::{Int32Decoder, Int32Encoder, StringDecoder, StringEncoder};
@@ -36,16 +36,16 @@ use protobuf_codec::scalar::{Int32Decoder, Int32Encoder, StringDecoder, StringEn
 // }
 type SearchRequestEncoder = MessageEncoder<
     Fields<(
-        OptionalFieldEncoder<F1, StringEncoder>,
-        OptionalFieldEncoder<F2, Int32Encoder>,
-        OptionalFieldEncoder<F3, Int32Encoder>,
+        MaybeDefault<FieldEncoder<F1, StringEncoder>>,
+        MaybeDefault<FieldEncoder<F2, Int32Encoder>>,
+        MaybeDefault<FieldEncoder<F3, Int32Encoder>>,
     )>,
 >;
 type SearchRequestDecoder = MessageDecoder<
     Fields<(
-        OptionalFieldDecoder<F1, StringDecoder>,
-        OptionalFieldDecoder<F2, Int32Decoder>,
-        OptionalFieldDecoder<F3, Int32Decoder>,
+        MaybeDefault<FieldDecoder<F1, StringDecoder>>,
+        MaybeDefault<FieldDecoder<F2, Int32Decoder>>,
+        MaybeDefault<FieldDecoder<F3, Int32Decoder>>,
     )>,
 >;
 
