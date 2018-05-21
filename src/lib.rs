@@ -15,7 +15,7 @@
 //! # extern crate protobuf_codec;
 //! use bytecodec::EncodeExt;
 //! use bytecodec::io::{IoDecodeExt, IoEncodeExt};
-//! use protobuf_codec::field::{Fields, OptionalFieldDecoder, OptionalFieldEncoder};
+//! use protobuf_codec::field::{Fields, FieldDecoder, FieldEncoder, MaybeDefault};
 //! use protobuf_codec::field::num::{F1, F2, F3};
 //! use protobuf_codec::message::{MessageDecoder, MessageEncoder};
 //! use protobuf_codec::scalar::{Int32Decoder, Int32Encoder, StringDecoder, StringEncoder};
@@ -29,16 +29,16 @@
 //! // }
 //! type SearchRequestEncoder = MessageEncoder<
 //!     Fields<(
-//!         OptionalFieldEncoder<F1, StringEncoder>,
-//!         OptionalFieldEncoder<F2, Int32Encoder>,
-//!         OptionalFieldEncoder<F3, Int32Encoder>,
+//!         MaybeDefault<FieldEncoder<F1, StringEncoder>>,
+//!         MaybeDefault<FieldEncoder<F2, Int32Encoder>>,
+//!         MaybeDefault<FieldEncoder<F3, Int32Encoder>>,
 //!     )>,
 //! >;
 //! type SearchRequestDecoder = MessageDecoder<
 //!     Fields<(
-//!         OptionalFieldDecoder<F1, StringDecoder>,
-//!         OptionalFieldDecoder<F2, Int32Decoder>,
-//!         OptionalFieldDecoder<F3, Int32Decoder>,
+//!         MaybeDefault<FieldDecoder<F1, StringDecoder>>,
+//!         MaybeDefault<FieldDecoder<F2, Int32Decoder>>,
+//!         MaybeDefault<FieldDecoder<F3, Int32Decoder>>,
 //!     )>,
 //! >;
 //!
@@ -129,16 +129,16 @@ mod test {
     // ```
     type SearchRequestEncoder = MessageEncoder<
         Fields<(
-            OptionalFieldEncoder<F1, StringEncoder>,
-            OptionalFieldEncoder<F2, Int32Encoder>,
-            OptionalFieldEncoder<F3, Int32Encoder>,
+            MaybeDefault<FieldEncoder<F1, StringEncoder>>,
+            MaybeDefault<FieldEncoder<F2, Int32Encoder>>,
+            MaybeDefault<FieldEncoder<F3, Int32Encoder>>,
         )>,
     >;
     type SearchRequestDecoder = MessageDecoder<
         Fields<(
-            OptionalFieldDecoder<F1, StringDecoder>,
-            OptionalFieldDecoder<F2, Int32Decoder>,
-            OptionalFieldDecoder<F3, Int32Decoder>,
+            MaybeDefault<FieldDecoder<F1, StringDecoder>>,
+            MaybeDefault<FieldDecoder<F2, Int32Decoder>>,
+            MaybeDefault<FieldDecoder<F3, Int32Decoder>>,
         )>,
     >;
 
@@ -222,23 +222,23 @@ mod test {
     // }
     // ```
     type SearchResponseEncoder =
-        MessageEncoder<RepeatedMessageFieldEncoder<F1, Vec<Result>, PreEncode<ResultEncoder>>>;
+        MessageEncoder<Repeated<Vec<Result>, MessageFieldEncoder<F1, PreEncode<ResultEncoder>>>>;
     type SearchResponseDecoder =
-        MessageDecoder<RepeatedMessageFieldDecoder<F1, Vec<Result>, ResultDecoder>>;
+        MessageDecoder<Repeated<Vec<Result>, MessageFieldDecoder<F1, ResultDecoder>>>;
 
     type Result = (String, String, Vec<String>);
     type ResultEncoder = MessageEncoder<
         Fields<(
-            OptionalFieldEncoder<F1, StringEncoder>,
-            OptionalFieldEncoder<F2, StringEncoder>,
-            RepeatedFieldEncoder<F3, Vec<String>, StringEncoder>,
+            MaybeDefault<FieldEncoder<F1, StringEncoder>>,
+            MaybeDefault<FieldEncoder<F2, StringEncoder>>,
+            Repeated<Vec<String>, FieldEncoder<F3, StringEncoder>>,
         )>,
     >;
     type ResultDecoder = MessageDecoder<
         Fields<(
-            OptionalFieldDecoder<F1, StringDecoder>,
-            OptionalFieldDecoder<F2, StringDecoder>,
-            RepeatedFieldDecoder<F3, Vec<String>, StringDecoder>,
+            MaybeDefault<FieldDecoder<F1, StringDecoder>>,
+            MaybeDefault<FieldDecoder<F2, StringDecoder>>,
+            Repeated<Vec<String>, FieldDecoder<F3, StringDecoder>>,
         )>,
     >;
 
@@ -270,8 +270,8 @@ mod test {
     //   repeated int32 d = 4 [packed=true];
     // }
     // ```
-    type Test4Encoder = MessageEncoder<PackedRepeatedFieldEncoder<F4, Vec<i32>, Int32Encoder>>;
-    type Test4Decoder = MessageDecoder<RepeatedNumericFieldDecoder<F4, Vec<i32>, Int32Decoder>>;
+    type Test4Encoder = MessageEncoder<PackedFieldEncoder<F4, Vec<i32>, Int32Encoder>>;
+    type Test4Decoder = MessageDecoder<PackedFieldDecoder<F4, Vec<i32>, Int32Decoder>>;
 
     #[test]
     fn test4_encoder_works() {
@@ -330,48 +330,52 @@ mod test {
     // }
     // ```
     type OneofTestEncoder = MessageEncoder<
-        Oneof<(
-            FieldEncoder<F4, StringEncoder>,
-            MessageFieldEncoder<F6, SearchRequestEncoder>,
-        )>,
+        Optional<
+            Oneof<(
+                FieldEncoder<F4, StringEncoder>,
+                MessageFieldEncoder<F6, SearchRequestEncoder>,
+            )>,
+        >,
     >;
     type OneofTestDecoder = MessageDecoder<
-        Oneof<(
-            FieldDecoder<F4, StringDecoder>,
-            MessageFieldDecoder<F6, SearchRequestDecoder>,
-        )>,
+        Optional<
+            Oneof<(
+                FieldDecoder<F4, StringDecoder>,
+                MessageFieldDecoder<F6, SearchRequestDecoder>,
+            )>,
+        >,
     >;
     #[test]
     fn oneof_test_encoder_works() {
         assert_encode!(
             OneofTestEncoder,
-            Branch2::A(s("foo")),
+            Some(Branch2::A(s("foo"))),
             [34, 3, 102, 111, 111]
         );
         assert_encode!(
             OneofTestEncoder,
-            Branch2::B(("bar".to_owned(), 3, 10)),
+            Some(Branch2::B(("bar".to_owned(), 3, 10))),
             [50, 9, 10, 3, 98, 97, 114, 16, 3, 24, 10]
         );
-        assert_encode!(OneofTestEncoder, Branch2::None, []);
+        assert_encode!(OneofTestEncoder, None, []);
     }
     #[test]
     fn oneof_test_decoder_works() {
         assert_decode!(
             OneofTestDecoder,
-            Branch2::A(s("foo")),
+            Some(Branch2::A(s("foo"))),
             [34, 3, 102, 111, 111]
         );
         assert_decode!(
             OneofTestDecoder,
-            Branch2::B(("bar".to_owned(), 3, 10)),
+            Some(Branch2::B(("bar".to_owned(), 3, 10))),
             [50, 9, 10, 3, 98, 97, 114, 16, 3, 24, 10]
         );
-        assert_decode!(OneofTestDecoder, Branch2::None, []);
+        assert_decode!(OneofTestDecoder, None, []);
 
         assert_decode!(
             OneofTestDecoder,
-            Branch2::A(s("baz")),
+            Some(Branch2::A(s("baz"))),
             [
                 34, 3, 102, 111, 111, // A("foo")
                 50, 9, 10, 3, 98, 97, 114, 16, 3, 24, 10, // B(("bar", 3, 10))

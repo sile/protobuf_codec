@@ -4,7 +4,7 @@ use bytecodec::{ByteCount, Decode, Encode, Eos, Error, ErrorKind, Result, SizedE
 use std;
 
 use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
-use value::{OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
+use value::{ValueDecode, ValueEncode};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagDecoder, WireType};
 
 /// This trait allows for decoding messages.
@@ -85,32 +85,24 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
 
         let mut offset = 0;
         while offset < buf.len() {
-            if self.field.is_decoding() {
-                let size = track!(self.field.field_decode(&buf[offset..], eos))?;
-                offset += size;
-                if self.field.is_decoding() {
-                    return Ok(offset);
+            bytecodec_try_decode!(self.field, offset, buf, eos);
+            bytecodec_try_decode!(self.unknown_field, offset, buf, eos);
+            if offset == buf.len() {
+                break;
+            }
+
+            let size = track!(self.tag.decode(&buf[offset..], eos))?;
+            offset += size;
+            if size != 0 {
+                self.is_tag_decoding = true;
+            }
+            if self.tag.is_idle() {
+                let tag = track!(self.tag.finish_decoding())?;
+                let started = track!(self.field.start_decoding(tag))?;
+                if !started {
+                    track!(self.unknown_field.start_decoding(tag))?;
                 }
-            } else if self.unknown_field.is_decoding() {
-                let size = track!(self.unknown_field.field_decode(&buf[offset..], eos))?;
-                offset += size;
-                if self.unknown_field.is_decoding() {
-                    return Ok(offset);
-                }
-            } else {
-                let size = track!(self.tag.decode(&buf[offset..], eos))?;
-                offset += size;
-                if size != 0 {
-                    self.is_tag_decoding = true;
-                }
-                if self.tag.is_idle() {
-                    let tag = track!(self.tag.finish_decoding())?;
-                    let started = track!(self.field.start_decoding(tag))?;
-                    if !started {
-                        track!(self.unknown_field.start_decoding(tag))?;
-                    }
-                    self.is_tag_decoding = false;
-                }
+                self.is_tag_decoding = false;
             }
         }
         self.eos = eos.is_reached();
@@ -129,9 +121,9 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     fn requiring_bytes(&self) -> ByteCount {
         if self.eos {
             ByteCount::Finite(0)
-        } else if self.field.is_decoding() {
+        } else if !self.field.is_idle() {
             self.field.requiring_bytes()
-        } else if self.unknown_field.is_decoding() {
+        } else if !self.unknown_field.is_idle() {
             self.unknown_field.requiring_bytes()
         } else {
             self.tag.requiring_bytes()
@@ -146,10 +138,10 @@ impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {}
 
 /// Decoder for embedded messages.
 #[derive(Debug, Default)]
-pub struct EmbeddedMessageDecoder<M>(LengthDelimitedDecoder<M>);
+pub(crate) struct EmbeddedMessageDecoder<M>(LengthDelimitedDecoder<M>);
 impl<M: MessageDecode> EmbeddedMessageDecoder<M> {
     /// Makes a new `EmbeddedMessageDecoder` instance.
-    pub fn new(message_decoder: M) -> Self {
+    pub(crate) fn new(message_decoder: M) -> Self {
         EmbeddedMessageDecoder(LengthDelimitedDecoder::new(message_decoder))
     }
 }
@@ -176,9 +168,6 @@ impl<M: MessageDecode> ValueDecode for EmbeddedMessageDecoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
     }
-}
-impl<M: MessageDecode> OptionalValueDecode for EmbeddedMessageDecoder<M> {
-    type Optional = Option<M::Item>;
 }
 
 /// Encoder for messages.
@@ -222,12 +211,12 @@ impl<F: FieldEncode> MessageEncode for MessageEncoder<F> {}
 
 /// Encoder for embedded messages.
 #[derive(Debug, Default)]
-pub struct EmbeddedMessageEncoder<M> {
+pub(crate) struct EmbeddedMessageEncoder<M> {
     message: LengthDelimitedEncoder<M>,
 }
 impl<M: MessageEncode + SizedEncode> EmbeddedMessageEncoder<M> {
     /// Makes a new `EmbeddedMessageEncoder` instance.
-    pub fn new(message_encoder: M) -> Self {
+    pub(crate) fn new(message_encoder: M) -> Self {
         EmbeddedMessageEncoder {
             message: LengthDelimitedEncoder::new(message_encoder),
         }
@@ -260,16 +249,5 @@ impl<M: MessageEncode + SizedEncode> SizedEncode for EmbeddedMessageEncoder<M> {
 impl<M: MessageEncode + SizedEncode> ValueEncode for EmbeddedMessageEncoder<M> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
-    }
-}
-impl<M: MessageEncode + SizedEncode> OptionalValueEncode for EmbeddedMessageEncoder<M> {
-    type Optional = Option<M::Item>;
-
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-        if let Some(item) = item {
-            track!(self.message.start_encoding(item))
-        } else {
-            Ok(())
-        }
     }
 }

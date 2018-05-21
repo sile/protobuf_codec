@@ -8,8 +8,8 @@ use bytecodec::fixnum::{F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, 
                         U64leDecoder, U64leEncoder};
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
 
-use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode,
-            OptionalValueDecode, OptionalValueEncode, ValueDecode, ValueEncode};
+use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode,
+            ValueEncode};
 use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType};
 
 macro_rules! impl_newtype_decode {
@@ -37,9 +37,6 @@ macro_rules! impl_newtype_decode {
             fn wire_type(&self) -> WireType {
                 WireType::$wire
             }
-        }
-        impl OptionalValueDecode for $decoder {
-            type Optional = $item;
         }
     };
 }
@@ -75,17 +72,6 @@ macro_rules! impl_newtype_encode {
                 WireType::$wire
             }
         }
-        impl OptionalValueEncode for $encoder {
-            type Optional = $item;
-
-            #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
-            fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-                if item != Self::Item::default() {
-                    track!(self.start_encoding(item))?;
-                }
-                Ok(())
-            }
-        }
     };
 }
 
@@ -114,9 +100,6 @@ macro_rules! impl_varint_decode {
             fn wire_type(&self) -> WireType {
                 WireType::Varint
             }
-        }
-        impl OptionalValueDecode for $decoder {
-            type Optional = $item;
         }
     };
 }
@@ -150,16 +133,6 @@ macro_rules! impl_varint_encode {
         impl ValueEncode for $encoder {
             fn wire_type(&self) -> WireType {
                 WireType::Varint
-            }
-        }
-        impl OptionalValueEncode for $encoder {
-            type Optional = $item;
-
-            fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-                if item != Self::Item::default() {
-                    track!(self.start_encoding(item))?;
-                }
-                Ok(())
             }
         }
     };
@@ -664,16 +637,6 @@ impl<B: AsRef<[u8]>> ValueEncode for BytesEncoder<B> {
         WireType::LengthDelimited
     }
 }
-impl<B: AsRef<[u8]>> OptionalValueEncode for BytesEncoder<B> {
-    type Optional = B;
-
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-        if !item.as_ref().is_empty() {
-            track!(self.start_encoding(item))?;
-        }
-        Ok(())
-    }
-}
 
 /// Encoder for custom `bytes` values.
 ///
@@ -785,16 +748,6 @@ impl<S: AsRef<str>> SizedEncode for StringEncoder<S> {
 impl<S: AsRef<str>> ValueEncode for StringEncoder<S> {
     fn wire_type(&self) -> WireType {
         WireType::LengthDelimited
-    }
-}
-impl<S: AsRef<str>> OptionalValueEncode for StringEncoder<S> {
-    type Optional = S;
-
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-        if !item.as_ref().is_empty() {
-            track!(self.start_encoding(item))?;
-        }
-        Ok(())
     }
 }
 impl<S: AsRef<str>> MapKeyEncode for StringEncoder<S> {}

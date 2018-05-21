@@ -1,5 +1,5 @@
 use bytecodec::combinator::{Map, MapErr, MapFrom, TryMap, TryMapFrom};
-use bytecodec::{Decode, Encode, Error, Result, SizedEncode};
+use bytecodec::{Decode, Encode, Error, SizedEncode};
 use std;
 
 use wire::WireType;
@@ -41,37 +41,6 @@ where
     }
 }
 
-/// This trait allows for decoding optional field values.
-pub trait OptionalValueDecode: ValueDecode {
-    /// The type of the optional field.
-    type Optional: Default + From<Self::Item>;
-}
-impl<V, T, F> OptionalValueDecode for Map<V, T, F>
-where
-    V: OptionalValueDecode,
-    V::Optional: From<T>,
-    F: Fn(V::Item) -> T,
-{
-    type Optional = V::Optional;
-}
-impl<V, T, E, F> OptionalValueDecode for TryMap<V, T, E, F>
-where
-    V: OptionalValueDecode,
-    V::Optional: From<T>,
-    F: Fn(V::Item) -> std::result::Result<T, E>,
-    Error: From<E>,
-{
-    type Optional = V::Optional;
-}
-impl<V, E, F> OptionalValueDecode for MapErr<V, E, F>
-where
-    V: OptionalValueDecode,
-    F: Fn(Error) -> E,
-    Error: From<E>,
-{
-    type Optional = V::Optional;
-}
-
 /// This trait allows for encoding field values.
 ///
 /// `Encode::Item` is the type of the field.
@@ -106,52 +75,6 @@ where
 {
     fn wire_type(&self) -> WireType {
         self.inner_ref().wire_type()
-    }
-}
-
-/// This trait allows for encoding optional field values.
-pub trait OptionalValueEncode: ValueEncode {
-    /// The type of the optional field.
-    type Optional;
-
-    /// Starts encoding the given field value if needed.
-    ///
-    /// If it is the default value of the field, the encoder will omit encoding the value.
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()>;
-}
-impl<V, T, F> OptionalValueEncode for MapFrom<V, T, F>
-where
-    V: OptionalValueEncode,
-    F: Fn(T) -> V::Item,
-{
-    type Optional = V::Optional;
-
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-        self.inner_mut().start_encoding_if_needed(item)
-    }
-}
-impl<V, T, E, F> OptionalValueEncode for TryMapFrom<V, T, E, F>
-where
-    V: OptionalValueEncode,
-    F: Fn(T) -> std::result::Result<V::Item, E>,
-    Error: From<E>,
-{
-    type Optional = V::Optional;
-
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-        self.inner_mut().start_encoding_if_needed(item)
-    }
-}
-impl<V, E, F> OptionalValueEncode for MapErr<V, E, F>
-where
-    V: OptionalValueEncode,
-    F: Fn(Error) -> E,
-    Error: From<E>,
-{
-    type Optional = V::Optional;
-
-    fn start_encoding_if_needed(&mut self, item: Self::Optional) -> Result<()> {
-        self.inner_mut().start_encoding_if_needed(item)
     }
 }
 
