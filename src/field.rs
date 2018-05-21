@@ -4,8 +4,8 @@ use bytecodec::padding::PaddingDecoder;
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 pub use fields::Fields;
 pub use oneof::Oneof;
-pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, PackedFieldDecoder, PackedFieldEncoder,
-                         Repeated};
+pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, MapMessageFieldDecoder,
+                         MapMessageFieldEncoder, PackedFieldDecoder, PackedFieldEncoder, Repeated};
 
 pub mod num {
     //! Field number.

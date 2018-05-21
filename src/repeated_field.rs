@@ -7,7 +7,7 @@ use std::mem;
 use field::num::{F1, F2, FieldNum};
 use field::{FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, Fields, MessageFieldDecoder,
             MessageFieldEncoder, RequiredFieldDecode, RequiredFieldEncode};
-use message::{MessageDecoder, MessageEncoder};
+use message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
 use scalar::BytesEncoder;
 use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode,
             ValueEncode};
@@ -249,9 +249,11 @@ where
     }
 }
 
-type MapMessageDecoder<K, V> = MessageDecoder<Fields<(FieldDecoder<F1, K>, FieldDecoder<F2, V>)>>;
+type ScalarEntryDecoder<K, V> = MessageDecoder<Fields<(FieldDecoder<F1, K>, FieldDecoder<F2, V>)>>;
+type MessageEntryDecoder<K, V> =
+    MessageDecoder<Fields<(FieldDecoder<F1, K>, MessageFieldDecoder<F2, V>)>>;
 
-/// Decoder for map fields.
+/// Decoder for map fields which have scalar values.
 #[derive(Default)]
 pub struct MapFieldDecoder<F, K, V, M>
 where
@@ -259,7 +261,7 @@ where
     K: MapKeyDecode,
     V: ValueDecode,
 {
-    inner: Repeated<MessageFieldDecoder<F, MapMessageDecoder<K, V>>, M>,
+    inner: Repeated<MessageFieldDecoder<F, ScalarEntryDecoder<K, V>>, M>,
 }
 impl<F, K, V, M> MapFieldDecoder<F, K, V, M>
 where
@@ -322,6 +324,80 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapFieldDecoder {{ .. }}")
+    }
+}
+
+/// Decoder for map fields which have message values.
+#[derive(Default)]
+pub struct MapMessageFieldDecoder<F, K, V, M>
+where
+    M: IntoIterator<Item = (K::Item, V::Item)>,
+    K: MapKeyDecode,
+    V: MessageDecode,
+{
+    inner: Repeated<MessageFieldDecoder<F, MessageEntryDecoder<K, V>>, M>,
+}
+impl<F, K, V, M> MapMessageFieldDecoder<F, K, V, M>
+where
+    K: MapKeyDecode,
+    V: MessageDecode,
+    M: IntoIterator<Item = (K::Item, V::Item)> + Default,
+{
+    /// Makes a new `MapMessageFieldDecoder` instance.
+    pub fn new(field_num: F, key_decoder: K, value_decoder: V) -> Self {
+        let fields = Fields::new((
+            FieldDecoder::new(F1, key_decoder),
+            MessageFieldDecoder::new(F2, value_decoder),
+        ));
+        let message = MessageDecoder::new(fields);
+        let inner = Repeated::new(MessageFieldDecoder::new(field_num, message));
+        MapMessageFieldDecoder { inner }
+    }
+}
+impl<F, K, V, M> Decode for MapMessageFieldDecoder<F, K, V, M>
+where
+    F: Copy + Into<FieldNum>,
+    K: MapKeyDecode,
+    V: MessageDecode,
+    M: Default + Extend<(K::Item, V::Item)> + IntoIterator<Item = (K::Item, V::Item)>,
+{
+    type Item = M;
+
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        track!(self.inner.decode(buf, eos))
+    }
+
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        track!(self.inner.finish_decoding())
+    }
+
+    fn is_idle(&self) -> bool {
+        self.inner.is_idle()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.inner.requiring_bytes()
+    }
+}
+impl<F, K, V, M> FieldDecode for MapMessageFieldDecoder<F, K, V, M>
+where
+    F: Copy + Into<FieldNum>,
+    K: MapKeyDecode,
+    V: MessageDecode,
+    M: Default + Extend<(K::Item, V::Item)> + IntoIterator<Item = (K::Item, V::Item)>,
+{
+    fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
+        track!(self.inner.start_decoding(tag))
+    }
+}
+impl<F, K, V, M> fmt::Debug for MapMessageFieldDecoder<F, K, V, M>
+where
+    K: MapKeyDecode,
+    V: MessageDecode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MapMessageFieldDecoder {{ .. }}")
     }
 }
 
@@ -415,12 +491,14 @@ where
 {
 }
 
-type MapMessageEncoder<K, V> = MessageEncoder<Fields<(FieldEncoder<F1, K>, FieldEncoder<F2, V>)>>;
+type ScalarEntryEncoder<K, V> = MessageEncoder<Fields<(FieldEncoder<F1, K>, FieldEncoder<F2, V>)>>;
+type MessageEntryEncoder<K, V> =
+    MessageEncoder<Fields<(FieldEncoder<F1, K>, MessageFieldEncoder<F2, V>)>>;
 
-/// Encoder for map fields.
+/// Encoder for map fields which have scalar values.
 #[derive(Default)]
 pub struct MapFieldEncoder<F, K, V, M: IntoIterator> {
-    inner: Repeated<MessageFieldEncoder<F, MapMessageEncoder<K, V>>, M>,
+    inner: Repeated<MessageFieldEncoder<F, ScalarEntryEncoder<K, V>>, M>,
 }
 impl<F, K, V, M> MapFieldEncoder<F, K, V, M>
 where
@@ -476,5 +554,67 @@ where
 impl<F, K, V, M: IntoIterator> fmt::Debug for MapFieldEncoder<F, K, V, M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapFieldEncoder {{ .. }}")
+    }
+}
+
+/// Encoder for map fields which have message values.
+#[derive(Default)]
+pub struct MapMessageFieldEncoder<F, K, V, M: IntoIterator> {
+    inner: Repeated<MessageFieldEncoder<F, MessageEntryEncoder<K, V>>, M>,
+}
+impl<F, K, V, M> MapMessageFieldEncoder<F, K, V, M>
+where
+    F: Copy + Into<FieldNum>,
+    K: SizedEncode + MapKeyEncode,
+    V: SizedEncode + MessageEncode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
+{
+    /// Makes a new `MapMessageFieldEncoder` instance.
+    pub fn new(field_num: F, key_encoder: K, value_encoder: V) -> Self {
+        let fields = Fields::new((
+            FieldEncoder::new(F1, key_encoder),
+            MessageFieldEncoder::new(F2, value_encoder),
+        ));
+        let message = MessageEncoder::new(fields);
+        let inner = Repeated::new(MessageFieldEncoder::new(field_num, message));
+        MapMessageFieldEncoder { inner }
+    }
+}
+impl<F, K, V, M> Encode for MapMessageFieldEncoder<F, K, V, M>
+where
+    F: Copy + Into<FieldNum>,
+    K: SizedEncode + MapKeyEncode,
+    V: SizedEncode + MessageEncode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
+{
+    type Item = M;
+
+    fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
+        track!(self.inner.encode(buf, eos))
+    }
+
+    fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
+        track!(self.inner.start_encoding(item))
+    }
+
+    fn is_idle(&self) -> bool {
+        self.inner.is_idle()
+    }
+
+    fn requiring_bytes(&self) -> ByteCount {
+        self.inner.requiring_bytes()
+    }
+}
+impl<F, K, V, M> FieldEncode for MapMessageFieldEncoder<F, K, V, M>
+where
+    F: Copy + Into<FieldNum>,
+    K: SizedEncode + MapKeyEncode,
+    V: SizedEncode + MessageEncode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
+{
+}
+impl<F, K, V, M: IntoIterator> fmt::Debug for MapMessageFieldEncoder<F, K, V, M> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MapMessageFieldEncoder {{ .. }}")
     }
 }
