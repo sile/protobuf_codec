@@ -222,23 +222,23 @@ mod test {
     // }
     // ```
     type SearchResponseEncoder =
-        MessageEncoder<Repeated<Vec<Result>, MessageFieldEncoder<F1, PreEncode<ResultEncoder>>>>;
+        MessageEncoder<Repeated<MessageFieldEncoder<F1, PreEncode<ResultEncoder>>, Vec<Result>>>;
     type SearchResponseDecoder =
-        MessageDecoder<Repeated<Vec<Result>, MessageFieldDecoder<F1, ResultDecoder>>>;
+        MessageDecoder<Repeated<MessageFieldDecoder<F1, ResultDecoder>, Vec<Result>>>;
 
     type Result = (String, String, Vec<String>);
     type ResultEncoder = MessageEncoder<
         Fields<(
             MaybeDefault<FieldEncoder<F1, StringEncoder>>,
             MaybeDefault<FieldEncoder<F2, StringEncoder>>,
-            Repeated<Vec<String>, FieldEncoder<F3, StringEncoder>>,
+            Repeated<FieldEncoder<F3, StringEncoder>, Vec<String>>,
         )>,
     >;
     type ResultDecoder = MessageDecoder<
         Fields<(
             MaybeDefault<FieldDecoder<F1, StringDecoder>>,
             MaybeDefault<FieldDecoder<F2, StringDecoder>>,
-            Repeated<Vec<String>, FieldDecoder<F3, StringDecoder>>,
+            Repeated<FieldDecoder<F3, StringDecoder>, Vec<String>>,
         )>,
     >;
 
@@ -270,8 +270,8 @@ mod test {
     //   repeated int32 d = 4 [packed=true];
     // }
     // ```
-    type Test4Encoder = MessageEncoder<PackedFieldEncoder<F4, Vec<i32>, Int32Encoder>>;
-    type Test4Decoder = MessageDecoder<PackedFieldDecoder<F4, Vec<i32>, Int32Decoder>>;
+    type Test4Encoder = MessageEncoder<PackedFieldEncoder<F4, Int32Encoder, Vec<i32>>>;
+    type Test4Decoder = MessageDecoder<PackedFieldDecoder<F4, Int32Decoder, Vec<i32>>>;
 
     #[test]
     fn test4_encoder_works() {
@@ -296,9 +296,9 @@ mod test {
     // }
     // ```
     type MapTestEncoder =
-        MessageEncoder<MapFieldEncoder<F5, Vec<(u64, bool)>, Uint64Encoder, BoolEncoder>>;
+        MessageEncoder<MapFieldEncoder<F5, Uint64Encoder, BoolEncoder, Vec<(u64, bool)>>>;
     type MapTestDecoder =
-        MessageDecoder<MapFieldDecoder<F5, Vec<(u64, bool)>, Uint64Decoder, BoolDecoder>>;
+        MessageDecoder<MapFieldDecoder<F5, Uint64Decoder, BoolDecoder, Vec<(u64, bool)>>>;
 
     #[test]
     fn map_test_encoder_works() {

@@ -13,39 +13,51 @@ use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, 
             ValueEncode};
 use wire::{LengthDelimitedDecoder, Tag, TagEncoder, WireType};
 
-/// TODO: doc
+/// Decoder and encoder for repeated fields.
 #[derive(Debug)]
-pub struct Repeated<V, D>
-where
-    V: IntoIterator,
-{
-    inner: D,
+pub struct Repeated<T, V: IntoIterator> {
+    inner: T,
     values: Option<V>,
     value_iter: Option<V::IntoIter>,
 }
-impl<V: IntoIterator, D> Repeated<V, D> {
-    /// TODO: doc
-    pub fn new(inner: D) -> Self {
+impl<T, V: IntoIterator> Repeated<T, V> {
+    /// Makes a new `Repeated` instance.
+    pub fn new(inner: T) -> Self {
         Repeated {
             inner,
             values: None,
             value_iter: None,
         }
     }
+
+    /// Returns a reference to the inner field encoder/decoder.
+    pub fn inner_ref(&self) -> &T {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner field encoder/decoder.
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
+    /// Takes the ownership of the instance, and returns the inner field encoder/decoder.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
 }
-impl<V: IntoIterator, D: Default> Default for Repeated<V, D> {
+impl<T: Default, V: IntoIterator> Default for Repeated<T, V> {
     fn default() -> Self {
         Repeated {
-            inner: D::default(),
+            inner: T::default(),
             values: None,
             value_iter: None,
         }
     }
 }
-impl<V, D> Decode for Repeated<V, D>
+impl<D, V> Decode for Repeated<D, V>
 where
-    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
     D: RequiredFieldDecode,
+    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
 {
     type Item = V;
 
@@ -77,10 +89,10 @@ where
         }
     }
 }
-impl<V, D> FieldDecode for Repeated<V, D>
+impl<D, V> FieldDecode for Repeated<D, V>
 where
-    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
     D: RequiredFieldDecode,
+    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
 {
     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
         let started = track!(self.inner.start_decoding(tag))?;
@@ -90,10 +102,10 @@ where
         Ok(started)
     }
 }
-impl<V, E> Encode for Repeated<V, E>
+impl<E, V> Encode for Repeated<E, V>
 where
-    V: IntoIterator<Item = E::Item>,
     E: RequiredFieldEncode,
+    V: IntoIterator<Item = E::Item>,
 {
     type Item = V;
 
@@ -131,10 +143,10 @@ where
         }
     }
 }
-impl<V, E> FieldEncode for Repeated<V, E>
+impl<E, V> FieldEncode for Repeated<E, V>
 where
-    V: IntoIterator<Item = E::Item>,
     E: RequiredFieldEncode,
+    V: IntoIterator<Item = E::Item>,
 {
 }
 
@@ -142,10 +154,10 @@ where
 ///
 /// Actually this can decode fields regardless of whether they are packed or not.
 #[derive(Debug, Default)]
-pub struct PackedFieldDecoder<F, V, D>
+pub struct PackedFieldDecoder<F, D, V>
 where
-    V: Default + Extend<D::Item>,
     D: NumericValueDecode,
+    V: Default + Extend<D::Item>,
 {
     num: F,
     decoder: LengthDelimitedDecoder<Collect<D, V>>,
@@ -153,10 +165,10 @@ where
     is_packed: bool,
     is_decoding: bool,
 }
-impl<F, V, D> PackedFieldDecoder<F, V, D>
+impl<F, D, V> PackedFieldDecoder<F, D, V>
 where
-    V: Default + Extend<D::Item>,
     D: NumericValueDecode,
+    V: Default + Extend<D::Item>,
 {
     /// Makes a new `PackedFieldDecoder` instance.
     pub fn new(field_num: F, value_decoder: D) -> Self {
@@ -169,11 +181,11 @@ where
         }
     }
 }
-impl<F, V, D> Decode for PackedFieldDecoder<F, V, D>
+impl<F, D, V> Decode for PackedFieldDecoder<F, D, V>
 where
     F: Copy + Into<FieldNum>,
-    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
     D: NumericValueDecode,
+    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
 {
     type Item = V;
 
@@ -214,11 +226,11 @@ where
         }
     }
 }
-impl<F, V, D> FieldDecode for PackedFieldDecoder<F, V, D>
+impl<F, D, V> FieldDecode for PackedFieldDecoder<F, D, V>
 where
     F: Copy + Into<FieldNum>,
-    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
     D: NumericValueDecode,
+    V: Default + Extend<D::Item> + IntoIterator<Item = D::Item>,
 {
     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
         if self.num.into() != tag.field_num {
@@ -241,19 +253,19 @@ type MapMessageDecoder<K, V> = MessageDecoder<Fields<(FieldDecoder<F1, K>, Field
 
 /// Decoder for map fields.
 #[derive(Default)]
-pub struct MapFieldDecoder<F, M, K, V>
+pub struct MapFieldDecoder<F, K, V, M>
 where
     M: IntoIterator<Item = (K::Item, V::Item)>,
     K: MapKeyDecode,
     V: ValueDecode,
 {
-    inner: Repeated<M, MessageFieldDecoder<F, MapMessageDecoder<K, V>>>,
+    inner: Repeated<MessageFieldDecoder<F, MapMessageDecoder<K, V>>, M>,
 }
-impl<F, M, K, V> MapFieldDecoder<F, M, K, V>
+impl<F, K, V, M> MapFieldDecoder<F, K, V, M>
 where
-    M: IntoIterator<Item = (K::Item, V::Item)> + Default,
     K: MapKeyDecode,
     V: ValueDecode,
+    M: IntoIterator<Item = (K::Item, V::Item)> + Default,
 {
     /// Makes a new `MapFieldDecoder` instance.
     pub fn new(field_num: F, key_decoder: K, value_decoder: V) -> Self {
@@ -266,12 +278,12 @@ where
         MapFieldDecoder { inner }
     }
 }
-impl<F, M, K, V> Decode for MapFieldDecoder<F, M, K, V>
+impl<F, K, V, M> Decode for MapFieldDecoder<F, K, V, M>
 where
     F: Copy + Into<FieldNum>,
-    M: Default + Extend<(K::Item, V::Item)> + IntoIterator<Item = (K::Item, V::Item)>,
     K: MapKeyDecode,
     V: ValueDecode,
+    M: Default + Extend<(K::Item, V::Item)> + IntoIterator<Item = (K::Item, V::Item)>,
 {
     type Item = M;
 
@@ -291,22 +303,22 @@ where
         self.inner.requiring_bytes()
     }
 }
-impl<F, M, K, V> FieldDecode for MapFieldDecoder<F, M, K, V>
+impl<F, K, V, M> FieldDecode for MapFieldDecoder<F, K, V, M>
 where
     F: Copy + Into<FieldNum>,
-    M: Default + Extend<(K::Item, V::Item)> + IntoIterator<Item = (K::Item, V::Item)>,
     K: MapKeyDecode,
     V: ValueDecode,
+    M: Default + Extend<(K::Item, V::Item)> + IntoIterator<Item = (K::Item, V::Item)>,
 {
     fn start_decoding(&mut self, tag: Tag) -> Result<bool> {
         track!(self.inner.start_decoding(tag))
     }
 }
-impl<F, M, K, V> fmt::Debug for MapFieldDecoder<F, M, K, V>
+impl<F, K, V, M> fmt::Debug for MapFieldDecoder<F, K, V, M>
 where
-    M: IntoIterator<Item = (K::Item, V::Item)>,
     K: MapKeyDecode,
     V: ValueDecode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapFieldDecoder {{ .. }}")
@@ -315,14 +327,14 @@ where
 
 /// Encoder for packed repeated fields.
 #[derive(Debug)]
-pub struct PackedFieldEncoder<F, V: IntoIterator, E> {
+pub struct PackedFieldEncoder<F, E, V: IntoIterator> {
     num: F,
     values: Option<V::IntoIter>,
     tag: TagEncoder,
     value: E,
     bytes: BytesEncoder,
 }
-impl<F, V: IntoIterator, E> PackedFieldEncoder<F, V, E> {
+impl<F, E, V: IntoIterator> PackedFieldEncoder<F, E, V> {
     /// Makes a new `PackedFieldEncoder` instance.
     pub fn new(field_num: F, value_encoder: E) -> Self {
         PackedFieldEncoder {
@@ -334,7 +346,7 @@ impl<F, V: IntoIterator, E> PackedFieldEncoder<F, V, E> {
         }
     }
 }
-impl<F: Default, V: IntoIterator, E: Default> Default for PackedFieldEncoder<F, V, E> {
+impl<F: Default, E: Default, V: IntoIterator> Default for PackedFieldEncoder<F, E, V> {
     fn default() -> Self {
         PackedFieldEncoder {
             num: F::default(),
@@ -345,11 +357,11 @@ impl<F: Default, V: IntoIterator, E: Default> Default for PackedFieldEncoder<F, 
         }
     }
 }
-impl<F, V, E> Encode for PackedFieldEncoder<F, V, E>
+impl<F, E, V> Encode for PackedFieldEncoder<F, E, V>
 where
     F: Copy + Into<FieldNum>,
-    V: IntoIterator<Item = E::Item>,
     E: NumericValueEncode,
+    V: IntoIterator<Item = E::Item>,
 {
     type Item = V;
 
@@ -385,21 +397,21 @@ where
         ByteCount::Finite(self.exact_requiring_bytes())
     }
 }
-impl<F, V, E> SizedEncode for PackedFieldEncoder<F, V, E>
+impl<F, E, V> SizedEncode for PackedFieldEncoder<F, E, V>
 where
     F: Copy + Into<FieldNum>,
-    V: IntoIterator<Item = E::Item>,
     E: NumericValueEncode,
+    V: IntoIterator<Item = E::Item>,
 {
     fn exact_requiring_bytes(&self) -> u64 {
         self.tag.exact_requiring_bytes() + self.bytes.exact_requiring_bytes()
     }
 }
-impl<F, V, E> FieldEncode for PackedFieldEncoder<F, V, E>
+impl<F, E, V> FieldEncode for PackedFieldEncoder<F, E, V>
 where
     F: Copy + Into<FieldNum>,
-    V: IntoIterator<Item = E::Item>,
     E: NumericValueEncode,
+    V: IntoIterator<Item = E::Item>,
 {
 }
 
@@ -407,15 +419,15 @@ type MapMessageEncoder<K, V> = MessageEncoder<Fields<(FieldEncoder<F1, K>, Field
 
 /// Encoder for map fields.
 #[derive(Default)]
-pub struct MapFieldEncoder<F, M: IntoIterator, K, V> {
-    inner: Repeated<M, MessageFieldEncoder<F, MapMessageEncoder<K, V>>>,
+pub struct MapFieldEncoder<F, K, V, M: IntoIterator> {
+    inner: Repeated<MessageFieldEncoder<F, MapMessageEncoder<K, V>>, M>,
 }
-impl<F, M, K, V> MapFieldEncoder<F, M, K, V>
+impl<F, K, V, M> MapFieldEncoder<F, K, V, M>
 where
     F: Copy + Into<FieldNum>,
-    M: IntoIterator<Item = (K::Item, V::Item)>,
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + ValueEncode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
 {
     /// Makes a new `MapFieldEncoder` instance.
     pub fn new(field_num: F, key_encoder: K, value_encoder: V) -> Self {
@@ -428,12 +440,12 @@ where
         MapFieldEncoder { inner }
     }
 }
-impl<F, M, K, V> Encode for MapFieldEncoder<F, M, K, V>
+impl<F, K, V, M> Encode for MapFieldEncoder<F, K, V, M>
 where
     F: Copy + Into<FieldNum>,
-    M: IntoIterator<Item = (K::Item, V::Item)>,
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + ValueEncode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
 {
     type Item = M;
 
@@ -453,15 +465,15 @@ where
         self.inner.requiring_bytes()
     }
 }
-impl<F, M, K, V> FieldEncode for MapFieldEncoder<F, M, K, V>
+impl<F, K, V, M> FieldEncode for MapFieldEncoder<F, K, V, M>
 where
     F: Copy + Into<FieldNum>,
-    M: IntoIterator<Item = (K::Item, V::Item)>,
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + ValueEncode,
+    M: IntoIterator<Item = (K::Item, V::Item)>,
 {
 }
-impl<F, M: IntoIterator, K, V> fmt::Debug for MapFieldEncoder<F, M, K, V> {
+impl<F, K, V, M: IntoIterator> fmt::Debug for MapFieldEncoder<F, K, V, M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapFieldEncoder {{ .. }}")
     }

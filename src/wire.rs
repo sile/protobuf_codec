@@ -163,7 +163,7 @@ impl Decode for VarintDecoder {
         self.index = 0;
         self.value = 0;
         self.idle = false;
-        return Ok(n);
+        Ok(n)
     }
 
     fn requiring_bytes(&self) -> ByteCount {

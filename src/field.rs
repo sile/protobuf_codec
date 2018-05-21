@@ -38,7 +38,10 @@ pub trait FieldDecode: Decode {
 
 /// This trait allows for decoding required fields.
 pub trait RequiredFieldDecode: FieldDecode {
-    /// TODO: doc
+    /// Returns `true` if this field has been present in the target input stream, otherwise `false`.
+    ///
+    /// Operationally, it means that the `start_decoding` method has been accepted by the decoder but
+    /// the corresponding `finish_decoding` method has not been called yet.
     fn is_present(&self) -> bool;
 }
 
@@ -48,7 +51,7 @@ pub trait FieldEncode: Encode {}
 /// This trait allows for encoding required fields.
 pub trait RequiredFieldEncode: FieldEncode {}
 
-/// Decoder for fields that have embedded messages as the value.
+/// Encoder for required embedded message fields.
 #[derive(Debug, Default)]
 pub struct MessageFieldDecoder<F, D: MessageDecode> {
     inner: FieldDecoder<F, EmbeddedMessageDecoder<D>>,
@@ -103,8 +106,7 @@ where
     }
 }
 
-// TODO: s/FieldDecoder/ScalarFieldDecoder/
-/// Decoder for required fields.
+/// Decoder for required scalar fields.
 #[derive(Debug, Default)]
 pub struct FieldDecoder<F, D: ValueDecode> {
     num: F,
@@ -177,14 +179,28 @@ where
     }
 }
 
-/// TODO: doc
+/// Decoder and encoder for optinal fields.
 #[derive(Debug, Default)]
 pub struct Optional<T>(T);
-
 impl<T> Optional<T> {
-    /// TODO: doc
+    /// Makes a new `Optional` instance.
     pub fn new(inner: T) -> Self {
         Optional(inner)
+    }
+
+    /// Returns a reference to the inner field encoder/decoder.
+    pub fn inner_ref(&self) -> &T {
+        &self.0
+    }
+
+    /// Returns a mutable reference to the inner field encoder/decoder.
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+
+    /// Takes the ownership of the instance, and returns the inner field encoder/decoder.
+    pub fn into_inner(self) -> T {
+        self.0
     }
 }
 impl<D: RequiredFieldDecode> Decode for Optional<D> {
@@ -248,9 +264,32 @@ impl<E: RequiredFieldEncode + SizedEncode> SizedEncode for Optional<E> {
 }
 impl<E: RequiredFieldEncode> FieldEncode for Optional<E> {}
 
-/// TODO: doc
+/// Decoder and encoder for optional fields which have the default values.
+///
+/// If a field is missing in a target input stream, the default value is used as the field value instead.
 #[derive(Debug, Default)]
 pub struct MaybeDefault<T>(Optional<T>);
+impl<T> MaybeDefault<T> {
+    /// Makes a new `MaybeDefault` instance.
+    pub fn new(inner: T) -> Self {
+        MaybeDefault(Optional::new(inner))
+    }
+
+    /// Returns a reference to the inner field encoder/decoder.
+    pub fn inner_ref(&self) -> &T {
+        self.0.inner_ref()
+    }
+
+    /// Returns a mutable reference to the inner field encoder/decoder.
+    pub fn inner_mut(&mut self) -> &mut T {
+        self.0.inner_mut()
+    }
+
+    /// Takes the ownership of the instance, and returns the inner field encoder/decoder.
+    pub fn into_inner(self) -> T {
+        self.0.into_inner()
+    }
+}
 impl<D> Decode for MaybeDefault<D>
 where
     D: RequiredFieldDecode,
@@ -421,7 +460,7 @@ enum UnknownFieldDecoderInner {
     LengthDelimited(LengthDelimitedDecoder<PaddingDecoder>),
 }
 
-/// TODO: doc
+/// Encoder for required embedded message fields.
 #[derive(Debug, Default)]
 pub struct MessageFieldEncoder<F, E> {
     inner: FieldEncoder<F, EmbeddedMessageEncoder<E>>,
@@ -430,7 +469,7 @@ impl<F, E> MessageFieldEncoder<F, E>
 where
     E: MessageEncode + SizedEncode,
 {
-    /// TODO: doc
+    /// Makes a new `MessageFieldEncoder` instance.
     pub fn new(field_num: F, message_encoder: E) -> Self {
         MessageFieldEncoder {
             inner: FieldEncoder::new(field_num, EmbeddedMessageEncoder::new(message_encoder)),
@@ -482,7 +521,7 @@ where
 {
 }
 
-/// Encoder for required fields.
+/// Encoder for required scalar fields.
 #[derive(Debug, Default)]
 pub struct FieldEncoder<F, E> {
     num: F,
