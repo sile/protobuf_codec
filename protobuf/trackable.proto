@@ -1,0 +1,19 @@
+// Protocol Buffers messages for https://crates.io/crates/trackable crate.
+syntax = "proto3";
+
+package trackable;
+
+// https://docs.rs/trackable/0.2/trackable/error/struct.TrackableError.html
+message Error {
+  string kind = 1;
+  string cause = 2;
+  repeated Location history = 3;
+}
+
+// https://docs.rs/trackable/0.2/trackable/struct.Location.html
+message Location {
+  string module_path = 1;
+  string file = 2;
+  uint32 line = 3;
+  string message = 4;
+}

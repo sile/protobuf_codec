@@ -77,6 +77,7 @@ mod macros;
 pub mod field;
 pub mod message;
 pub mod scalar;
+pub mod wellknown;
 pub mod wire;
 
 mod field_num;
