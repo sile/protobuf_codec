@@ -1,7 +1,7 @@
 // Protocol Buffers messages for https://crates.io/crates/trackable crate.
 syntax = "proto3";
 
-package trackable;
+package protobuf_codec.protobuf.trackable;
 
 // https://docs.rs/trackable/0.2/trackable/error/struct.TrackableError.html
 message Error {

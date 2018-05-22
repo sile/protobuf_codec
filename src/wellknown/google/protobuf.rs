@@ -1,4 +1,6 @@
-//! Encoders and decoders for the messages defined in [google/protobuf].
+//! `package google.protobuf;`
+//!
+//! See also [google/protobuf].
 //!
 //! [google/protobuf]: https://github.com/google/protobuf/tree/master/src/google/protobuf
 #![cfg_attr(feature = "cargo-clippy", allow(type_complexity))]

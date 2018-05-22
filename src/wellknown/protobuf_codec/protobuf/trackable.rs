@@ -1,6 +1,8 @@
-//! Encoders and decoders for [trackable] crate.
+//! `package protobuf_codec.protobuf.trackable;`
 //!
-//! [trackable]: https://crates.io/crates/trackable
+//! See also [protobuf_codec/protobuf/trackable.proto].
+//!
+//! [protobuf_codec/protobuf/trackable.proto]: https://github.com/sile/protobuf_codec/blob/master/protobuf/trackable.proto
 #![cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
 use std::error::Error;
