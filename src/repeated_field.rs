@@ -73,7 +73,7 @@ where
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
         track_assert!(!self.inner.is_present(), ErrorKind::IncompleteDecoding);
-        let values = track_assert_some!(self.values.take(), ErrorKind::InconsistentState);
+        let values = self.values.take().unwrap_or_else(V::default);
         Ok(values)
     }
 

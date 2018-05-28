@@ -384,4 +384,18 @@ mod test {
             ]
         );
     }
+
+    // ```proto3
+    // message EmptyRepeatedTest {
+    //   repeated string names = 1;
+    // }
+    // ```
+    type EmptyRepeatedTestDecoder =
+        MessageDecoder<Repeated<FieldDecoder<F1, StringDecoder>, Vec<String>>>;
+
+    #[test]
+    fn empty_repeated_test_decoder_works() {
+        let expected: Vec<String> = Vec::new();
+        assert_decode!(EmptyRepeatedTestDecoder, expected, []);
+    }
 }
