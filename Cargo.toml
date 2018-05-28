@@ -1,6 +1,6 @@
 [package]
 name = "protobuf_codec"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "Encoders and decoders for Protocol Buffers based on bytecodec crate"
 homepage = "https://github.com/sile/protobuf_codec"
