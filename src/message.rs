@@ -60,8 +60,9 @@ pub struct MessageDecoder<F> {
     tag: TagDecoder,
     field: F,
     unknown_field: UnknownFieldDecoder,
-    is_tag_decoding: bool,
-    eos: bool,
+    bos: bool, // beginning-of-stream
+    eos: bool, // end-of-stream
+    target: DecodeTarget,
 }
 impl<F: FieldDecode> MessageDecoder<F> {
     /// Makes a new `MessageDecoder` instance.
@@ -70,8 +71,9 @@ impl<F: FieldDecode> MessageDecoder<F> {
             tag: TagDecoder::default(),
             field: field_decoder,
             unknown_field: UnknownFieldDecoder::default(),
-            is_tag_decoding: false,
+            bos: true,
             eos: false,
+            target: DecodeTarget::None,
         }
     }
 }
@@ -79,30 +81,40 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     type Item = F::Item;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        self.bos = false;
         if self.eos {
             return Ok(0);
         }
 
         let mut offset = 0;
         while offset < buf.len() {
-            bytecodec_try_decode!(self.field, offset, buf, eos);
-            bytecodec_try_decode!(self.unknown_field, offset, buf, eos);
-            if offset == buf.len() {
-                break;
-            }
-
-            let size = track!(self.tag.decode(&buf[offset..], eos))?;
-            offset += size;
-            if size != 0 {
-                self.is_tag_decoding = true;
-            }
-            if self.tag.is_idle() {
-                let tag = track!(self.tag.finish_decoding())?;
-                let started = track!(self.field.start_decoding(tag))?;
-                if !started {
-                    track!(self.unknown_field.start_decoding(tag))?;
+            match self.target {
+                DecodeTarget::None | DecodeTarget::Tag => {
+                    let size = track!(self.tag.decode(&buf[offset..], eos))?;
+                    offset += size;
+                    if size != 0 {
+                        self.target = DecodeTarget::Tag;
+                    }
+                    if self.tag.is_idle() {
+                        let tag = track!(self.tag.finish_decoding())?;
+                        let started = track!(self.field.start_decoding(tag))?;
+                        if started {
+                            self.target = DecodeTarget::KnownField;
+                        } else {
+                            self.target = DecodeTarget::UnknownField;
+                            track!(self.unknown_field.start_decoding(tag))?;
+                        }
+                    }
                 }
-                self.is_tag_decoding = false;
+                DecodeTarget::KnownField => {
+                    bytecodec_try_decode!(self.field, offset, buf, eos);
+                    self.target = DecodeTarget::None;
+                }
+                DecodeTarget::UnknownField => {
+                    bytecodec_try_decode!(self.unknown_field, offset, buf, eos);
+                    track!(self.unknown_field.finish_decoding())?;
+                    self.target = DecodeTarget::None;
+                }
             }
         }
         self.eos = eos.is_reached();
@@ -110,10 +122,14 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     }
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
-        track_assert!(self.eos, ErrorKind::IncompleteDecoding);
-        track_assert!(!self.is_tag_decoding, ErrorKind::IncompleteDecoding);
+        track_assert!(self.bos | self.eos, ErrorKind::IncompleteDecoding; self.target, self.bos, self.eos);
+        track_assert_eq!(
+            self.target,
+            DecodeTarget::None,
+            ErrorKind::IncompleteDecoding
+        );
         let v = track!(self.field.finish_decoding())?;
-        track!(self.unknown_field.finish_decoding())?;
+        self.bos = true;
         self.eos = false;
         Ok(v)
     }
@@ -121,12 +137,13 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     fn requiring_bytes(&self) -> ByteCount {
         if self.eos {
             ByteCount::Finite(0)
-        } else if !self.field.is_idle() {
-            self.field.requiring_bytes()
-        } else if !self.unknown_field.is_idle() {
-            self.unknown_field.requiring_bytes()
         } else {
-            self.tag.requiring_bytes()
+            match self.target {
+                DecodeTarget::None => ByteCount::Unknown,
+                DecodeTarget::Tag => self.tag.requiring_bytes(),
+                DecodeTarget::KnownField => self.field.requiring_bytes(),
+                DecodeTarget::UnknownField => self.unknown_field.requiring_bytes(),
+            }
         }
     }
 
@@ -135,6 +152,19 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     }
 }
 impl<F: FieldDecode> MessageDecode for MessageDecoder<F> {}
+
+#[derive(Debug, PartialEq, Eq)]
+enum DecodeTarget {
+    None,
+    Tag,
+    KnownField,
+    UnknownField,
+}
+impl Default for DecodeTarget {
+    fn default() -> Self {
+        DecodeTarget::None
+    }
+}
 
 /// Decoder for embedded messages.
 #[derive(Debug, Default)]
