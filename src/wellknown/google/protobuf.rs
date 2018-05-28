@@ -303,3 +303,21 @@ impl SizedEncode for StdDurationEncoder {
     }
 }
 impl MessageEncode for StdDurationEncoder {}
+
+#[cfg(test)]
+mod test {
+    use bytecodec::DecodeExt;
+
+    use super::*;
+    use field::{MessageFieldDecoder, num::F2};
+    use message::MessageDecoder;
+
+    #[test]
+    fn duration_decoder_works() {
+        let mut decoder: MessageDecoder<MessageFieldDecoder<F2, StdDurationDecoder>> =
+            Default::default();
+
+        let input = [18, 0];
+        track_try_unwrap!(decoder.decode_from_bytes(&input[..]));
+    }
+}

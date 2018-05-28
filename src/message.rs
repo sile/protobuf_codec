@@ -60,7 +60,7 @@ pub struct MessageDecoder<F> {
     tag: TagDecoder,
     field: F,
     unknown_field: UnknownFieldDecoder,
-    bos: bool, // beginning-of-stream
+    started: bool,
     eos: bool, // end-of-stream
     target: DecodeTarget,
 }
@@ -71,7 +71,7 @@ impl<F: FieldDecode> MessageDecoder<F> {
             tag: TagDecoder::default(),
             field: field_decoder,
             unknown_field: UnknownFieldDecoder::default(),
-            bos: true,
+            started: false,
             eos: false,
             target: DecodeTarget::None,
         }
@@ -81,7 +81,7 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     type Item = F::Item;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
-        self.bos = false;
+        self.started = true;
         if self.eos {
             return Ok(0);
         }
@@ -122,14 +122,14 @@ impl<F: FieldDecode> Decode for MessageDecoder<F> {
     }
 
     fn finish_decoding(&mut self) -> Result<Self::Item> {
-        track_assert!(self.bos | self.eos, ErrorKind::IncompleteDecoding; self.target, self.bos, self.eos);
+        track_assert!(!self.started | self.eos, ErrorKind::IncompleteDecoding; self.target, self.started, self.eos);
         track_assert_eq!(
             self.target,
             DecodeTarget::None,
             ErrorKind::IncompleteDecoding
         );
         let v = track!(self.field.finish_decoding())?;
-        self.bos = true;
+        self.started = false;
         self.eos = false;
         Ok(v)
     }
