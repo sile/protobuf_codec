@@ -4,8 +4,10 @@ use bytecodec::padding::PaddingDecoder;
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 pub use fields::Fields;
 pub use oneof::Oneof;
-pub use repeated_field::{MapFieldDecoder, MapFieldEncoder, MapMessageFieldDecoder,
-                         MapMessageFieldEncoder, PackedFieldDecoder, PackedFieldEncoder, Repeated};
+pub use repeated_field::{
+    MapFieldDecoder, MapFieldEncoder, MapMessageFieldDecoder, MapMessageFieldEncoder,
+    PackedFieldDecoder, PackedFieldEncoder, Repeated,
+};
 
 pub mod num {
     //! Field number.
@@ -365,8 +367,7 @@ impl<E> FieldEncode for MaybeDefault<E>
 where
     E: RequiredFieldEncode,
     E::Item: Default + PartialEq,
-{
-}
+{}
 
 /// Decoder for unknown fields.
 ///
@@ -512,14 +513,12 @@ impl<F, E> FieldEncode for MessageFieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: MessageEncode + SizedEncode,
-{
-}
+{}
 impl<F, E> RequiredFieldEncode for MessageFieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: MessageEncode + SizedEncode,
-{
-}
+{}
 
 /// Encoder for required scalar fields.
 #[derive(Debug, Default)]
@@ -585,19 +584,17 @@ impl<F, E> FieldEncode for FieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: ValueEncode,
-{
-}
+{}
 impl<F, E> RequiredFieldEncode for FieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: ValueEncode,
-{
-}
+{}
 
 #[cfg(test)]
 mod test {
-    use bytecodec::EncodeExt;
     use bytecodec::io::IoEncodeExt;
+    use bytecodec::EncodeExt;
 
     use super::*;
     use scalar::Fixed32Encoder;

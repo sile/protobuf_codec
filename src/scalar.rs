@@ -1,16 +1,21 @@
 //! Encoders and decoders for [scalar] values.
 //!
 //! [scalar]: https://developers.google.com/protocol-buffers/docs/proto3#scalar
-use bytecodec::bytes::{BytesEncoder as BytesEncoderInner, RemainingBytesDecoder, Utf8Decoder,
-                       Utf8Encoder};
-use bytecodec::fixnum::{F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, I32leDecoder,
-                        I32leEncoder, I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder,
-                        U64leDecoder, U64leEncoder};
+use bytecodec::bytes::{
+    BytesEncoder as BytesEncoderInner, RemainingBytesDecoder, Utf8Decoder, Utf8Encoder,
+};
+use bytecodec::fixnum::{
+    F32leDecoder, F32leEncoder, F64leDecoder, F64leEncoder, I32leDecoder, I32leEncoder,
+    I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder, U64leDecoder, U64leEncoder,
+};
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
 
-use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode,
-            ValueEncode};
-use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType};
+use value::{
+    MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode, ValueEncode,
+};
+use wire::{
+    LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType,
+};
 
 macro_rules! impl_newtype_decode {
     ($decoder:ty, $item:ty, $wire:ident) => {
@@ -754,8 +759,8 @@ impl<S: AsRef<str>> MapKeyEncode for StringEncoder<S> {}
 
 #[cfg(test)]
 mod test {
-    use bytecodec::EncodeExt;
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
+    use bytecodec::EncodeExt;
 
     use super::*;
 

@@ -20,15 +20,13 @@ where
     M: MessageDecode,
     F: Fn(M::Item) -> std::result::Result<T, E>,
     Error: From<E>,
-{
-}
+{}
 impl<M, E, F> MessageDecode for MapErr<M, E, F>
 where
     M: MessageDecode,
     F: Fn(Error) -> E,
     Error: From<E>,
-{
-}
+{}
 
 /// This trait allows for encoding messages.
 pub trait MessageEncode: Encode {}
@@ -37,22 +35,19 @@ impl<M, T, F> MessageEncode for MapFrom<M, T, F>
 where
     M: MessageEncode,
     F: Fn(T) -> M::Item,
-{
-}
+{}
 impl<M, T, E, F> MessageEncode for TryMapFrom<M, T, E, F>
 where
     M: MessageEncode,
     F: Fn(T) -> std::result::Result<M::Item, E>,
     Error: From<E>,
-{
-}
+{}
 impl<M, E, F> MessageEncode for MapErr<M, E, F>
 where
     M: MessageEncode,
     F: Fn(Error) -> E,
     Error: From<E>,
-{
-}
+{}
 
 /// Decoder for messages.
 #[derive(Debug, Default)]

@@ -139,7 +139,7 @@ macro_rules! protobuf_message_encoder {
         $crate::message::MessageEncoder::new($crate::field::Fields::new(()))
     };
     ($field:tt) => {
-        $crate::message::MessageEncoder::new(protobuf_message_field_encoder! $field) 
+        $crate::message::MessageEncoder::new(protobuf_message_field_encoder! $field)
     };
     ($($field:tt),*) => {
         $crate::message::MessageEncoder::new(

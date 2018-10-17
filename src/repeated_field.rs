@@ -4,13 +4,16 @@ use std::fmt;
 use std::iter;
 use std::mem;
 
-use field::num::{F1, F2, FieldNum};
-use field::{FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, Fields, MessageFieldDecoder,
-            MessageFieldEncoder, RequiredFieldDecode, RequiredFieldEncode};
+use field::num::{FieldNum, F1, F2};
+use field::{
+    FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, Fields, MessageFieldDecoder,
+    MessageFieldEncoder, RequiredFieldDecode, RequiredFieldEncode,
+};
 use message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
 use scalar::BytesEncoder;
-use value::{MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode,
-            ValueEncode};
+use value::{
+    MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode, ValueEncode,
+};
 use wire::{LengthDelimitedDecoder, Tag, TagEncoder, WireType};
 
 /// Decoder and encoder for repeated fields.
@@ -147,8 +150,7 @@ impl<E, V> FieldEncode for Repeated<E, V>
 where
     E: RequiredFieldEncode,
     V: IntoIterator<Item = E::Item>,
-{
-}
+{}
 
 /// Decoder for packed repeated fields.
 ///
@@ -488,8 +490,7 @@ where
     F: Copy + Into<FieldNum>,
     E: NumericValueEncode,
     V: IntoIterator<Item = E::Item>,
-{
-}
+{}
 
 type ScalarEntryEncoder<K, V> = MessageEncoder<Fields<(FieldEncoder<F1, K>, FieldEncoder<F2, V>)>>;
 type MessageEntryEncoder<K, V> =
@@ -549,8 +550,7 @@ where
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + ValueEncode,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-{
-}
+{}
 impl<F, K, V, M: IntoIterator> fmt::Debug for MapFieldEncoder<F, K, V, M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapFieldEncoder {{ .. }}")
@@ -611,8 +611,7 @@ where
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + MessageEncode,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-{
-}
+{}
 impl<F, K, V, M: IntoIterator> fmt::Debug for MapMessageFieldEncoder<F, K, V, M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapMessageFieldEncoder {{ .. }}")

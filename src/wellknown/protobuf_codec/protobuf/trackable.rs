@@ -10,8 +10,10 @@ use trackable::error::{ErrorKindExt, TrackableError};
 use trackable::{Location, Trackable};
 
 use field::num::{F1, F2, F3, F4};
-use field::{FieldDecoder, FieldEncoder, Fields, MaybeDefault, MessageFieldDecoder,
-            MessageFieldEncoder, Repeated};
+use field::{
+    FieldDecoder, FieldEncoder, Fields, MaybeDefault, MessageFieldDecoder, MessageFieldEncoder,
+    Repeated,
+};
 use message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
 use scalar::{StringDecoder, StringEncoder, Uint32Decoder, Uint32Encoder};
 

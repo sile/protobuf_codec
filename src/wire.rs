@@ -368,8 +368,8 @@ impl<E: SizedEncode> SizedEncode for LengthDelimitedEncoder<E> {
 
 #[cfg(test)]
 mod test {
-    use bytecodec::Encode;
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
+    use bytecodec::Encode;
 
     use super::*;
 

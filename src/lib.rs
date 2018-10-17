@@ -88,9 +88,9 @@ mod value;
 
 #[cfg(test)]
 mod test {
-    use bytecodec::EncodeExt;
     use bytecodec::combinator::PreEncode;
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
+    use bytecodec::EncodeExt;
 
     use field::branch::*;
     use field::num::*;
@@ -248,9 +248,7 @@ mod test {
         assert_encode!(
             SearchResponseEncoder,
             vec![(s("foo"), s("111"), vec![s("a"), s("b"), s("c")])],
-            [
-                10, 19, 10, 3, 102, 111, 111, 18, 3, 49, 49, 49, 26, 1, 97, 26, 1, 98, 26, 1, 99
-            ]
+            [10, 19, 10, 3, 102, 111, 111, 18, 3, 49, 49, 49, 26, 1, 97, 26, 1, 98, 26, 1, 99]
         );
     }
     #[test]
@@ -258,9 +256,7 @@ mod test {
         assert_decode!(
             SearchResponseDecoder,
             vec![(s("foo"), s("111"), vec![s("a"), s("b"), s("c")])],
-            [
-                10, 19, 10, 3, 102, 111, 111, 18, 3, 49, 49, 49, 26, 1, 97, 26, 1, 98, 26, 1, 99
-            ]
+            [10, 19, 10, 3, 102, 111, 111, 18, 3, 49, 49, 49, 26, 1, 97, 26, 1, 98, 26, 1, 99]
         );
     }
 
@@ -306,9 +302,7 @@ mod test {
         assert_encode!(
             MapTestEncoder,
             vec![(0, true), (11, false), (222, true)],
-            [
-                42, 4, 8, 0, 16, 1, 42, 4, 8, 11, 16, 0, 42, 5, 8, 222, 1, 16, 1
-            ]
+            [42, 4, 8, 0, 16, 1, 42, 4, 8, 11, 16, 0, 42, 5, 8, 222, 1, 16, 1]
         );
     }
     #[test]
@@ -316,9 +310,7 @@ mod test {
         assert_decode!(
             MapTestDecoder,
             vec![(0, true), (11, false), (222, true)],
-            [
-                42, 4, 8, 0, 16, 1, 42, 4, 8, 11, 16, 0, 42, 5, 8, 222, 1, 16, 1
-            ]
+            [42, 4, 8, 0, 16, 1, 42, 4, 8, 11, 16, 0, 42, 5, 8, 222, 1, 16, 1]
         );
     }
 

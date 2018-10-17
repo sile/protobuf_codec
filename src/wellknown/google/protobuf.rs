@@ -309,7 +309,7 @@ mod test {
     use bytecodec::DecodeExt;
 
     use super::*;
-    use field::{MessageFieldDecoder, num::F2};
+    use field::{num::F2, MessageFieldDecoder};
     use message::MessageDecoder;
 
     #[test]
