@@ -1,9 +1,18 @@
 language: rust
 sudo: required
+
 rust:
   - stable
   - beta
   - nightly
+
+before_script:
+  - rustup component add rustfmt-preview
+
+script:
+  - cargo test
+  - cargo clippy
+
 matrix:
   allow_failures:
     - rust: nightly
