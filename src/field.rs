@@ -124,6 +124,16 @@ impl<F, D: ValueDecode> FieldDecoder<F, D> {
             present: false,
         }
     }
+
+    /// Returns a reference to the value decoder of this instance.
+    pub fn value_decoder_ref(&self) -> &D {
+        &self.value
+    }
+
+    /// Returns a mutable reference to the value decoder of this instance.
+    pub fn value_decoder_mut(&mut self) -> &mut D {
+        &mut self.value
+    }
 }
 impl<F, D> Decode for FieldDecoder<F, D>
 where
@@ -538,6 +548,16 @@ where
             tag: TagEncoder::new(),
             value: value_encoder,
         }
+    }
+
+    /// Returns a reference to the value encoder of this instance.
+    pub fn value_encoder_ref(&self) -> &E {
+        &self.value
+    }
+
+    /// Returns a mutable reference to the value encoder of this instance.
+    pub fn value_encoder_mut(&mut self) -> &mut E {
+        &mut self.value
     }
 }
 impl<F, E> Encode for FieldEncoder<F, E>
