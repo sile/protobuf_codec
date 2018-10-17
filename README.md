@@ -1,7 +1,7 @@
 protobuf_codec
 ==============
 
-[![protobuf_codec](http://meritbadge.herokuapp.com/protobuf_codec)](https://crates.io/crates/protobuf_codec)
+[![protobuf_codec](https://img.shields.io/crates/v/protobuf_codec.svg)](https://crates.io/crates/protobuf_codec)
 [![Documentation](https://docs.rs/protobuf_codec/badge.svg)](https://docs.rs/protobuf_codec)
 [![Build Status](https://travis-ci.org/sile/protobuf_codec.svg?branch=master)](https://travis-ci.org/sile/protobuf_codec)
 [![Code Coverage](https://codecov.io/gh/sile/protobuf_codec/branch/master/graph/badge.svg)](https://codecov.io/gh/sile/protobuf_codec/branch/master)
