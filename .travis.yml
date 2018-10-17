@@ -1,9 +1,6 @@
 language: rust
 sudo: required
 
-env:
-  - RUSTFLAGS="-D warnings"
-
 rust:
   - stable
   - beta
@@ -22,7 +19,7 @@ matrix:
 
 env:
   global:
-  - RUSTFLAGS="-C link-dead-code"
+  - RUSTFLAGS="-C link-dead-code -D warnings"
 
 addons:
   apt:
