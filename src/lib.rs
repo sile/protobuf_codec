@@ -66,6 +66,7 @@
 //! [proto3]: https://developers.google.com/protocol-buffers/docs/proto3
 //! [encoding]: https://developers.google.com/protocol-buffers/docs/encoding
 #![warn(missing_docs)]
+#![deny(warnings)]
 #[macro_use]
 extern crate bytecodec;
 #[macro_use]
