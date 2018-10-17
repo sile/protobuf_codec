@@ -1,4 +1,4 @@
-use bytecodec::combinator::{Map, MapErr, MapFrom, TryMap, TryMapFrom};
+use bytecodec::combinator::{Map, MapErr, MapFrom, Peekable, TryMap, TryMapFrom};
 use bytecodec::{Decode, Encode, Error, SizedEncode};
 use std;
 
@@ -36,6 +36,11 @@ where
     F: Fn(Error) -> E,
     Error: From<E>,
 {
+    fn wire_type(&self) -> WireType {
+        self.inner_ref().wire_type()
+    }
+}
+impl<V: ValueDecode> ValueDecode for Peekable<V> {
     fn wire_type(&self) -> WireType {
         self.inner_ref().wire_type()
     }
