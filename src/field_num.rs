@@ -30,7 +30,7 @@ impl FieldNum {
     }
 
     /// Returns the value of the field number.
-    pub fn as_u32(&self) -> u32 {
+    pub fn as_u32(self) -> u32 {
         self.0
     }
 }
