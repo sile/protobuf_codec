@@ -90,7 +90,8 @@ mod value;
 mod test {
     use bytecodec::combinator::PreEncode;
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
-    use bytecodec::EncodeExt;
+    use bytecodec::SizedEncode;
+    use bytecodec::{DecodeExt, EncodeExt};
 
     use field::branch::*;
     use field::num::*;
@@ -389,5 +390,53 @@ mod test {
     fn empty_repeated_test_decoder_works() {
         let expected: Vec<String> = Vec::new();
         assert_decode!(EmptyRepeatedTestDecoder, expected, []);
+    }
+
+    /// An example for encoder and decoder with only one field.
+    #[derive(Debug, PartialEq, Eq)]
+    struct Seconds(u64);
+
+    fn seconds_decoder() -> impl MessageDecode<Item = Seconds> {
+        let base = protobuf_message_decoder![(F1, Uint64Decoder::new())];
+        base.map(|x| Seconds(x))
+    }
+
+    fn seconds_encoder() -> impl SizedEncode<Item = Seconds> + MessageEncode<Item = Seconds> {
+        let base = protobuf_message_encoder![(F1, Uint64Encoder::new())];
+        base.map_from(|x: Seconds| (x.0))
+    }
+
+    #[test]
+    fn seconds_encoder_works() {
+        assert_eq!(
+            seconds_encoder().encode_into_bytes(Seconds(0)).unwrap(),
+            vec![].to_owned()
+        );
+        assert_eq!(
+            seconds_encoder().encode_into_bytes(Seconds(1)).unwrap(),
+            vec![0x08, 0x01].to_owned()
+        );
+    }
+
+    #[test]
+    fn seconds_decoder_works() {
+        assert_eq!(
+            seconds_decoder()
+                .decode_from_bytes(vec![].as_ref())
+                .unwrap(),
+            Seconds(0)
+        );
+        assert_eq!(
+            seconds_decoder()
+                .decode_from_bytes(vec![0x08, 0x5c].as_ref())
+                .unwrap(),
+            Seconds(92)
+        );
+        assert_eq!(
+            seconds_decoder()
+                .decode_from_bytes(vec![0x08, 0x03].as_ref())
+                .unwrap(),
+            Seconds(3)
+        );
     }
 }
