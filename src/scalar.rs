@@ -758,7 +758,7 @@ impl<S: AsRef<str>> ValueEncode for StringEncoder<S> {
 impl<S: AsRef<str>> MapKeyEncode for StringEncoder<S> {}
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
     use bytecodec::EncodeExt;
 

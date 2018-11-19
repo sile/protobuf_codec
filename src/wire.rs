@@ -367,7 +367,7 @@ impl<E: SizedEncode> SizedEncode for LengthDelimitedEncoder<E> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
     use bytecodec::Encode;
 

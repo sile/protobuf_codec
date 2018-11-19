@@ -87,11 +87,10 @@ mod repeated_field;
 mod value;
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::combinator::PreEncode;
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
-    use bytecodec::SizedEncode;
-    use bytecodec::{DecodeExt, EncodeExt};
+    use bytecodec::{DecodeExt, EncodeExt, SizedEncode};
 
     use field::branch::*;
     use field::num::*;

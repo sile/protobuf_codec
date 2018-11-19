@@ -239,15 +239,12 @@ macro_rules! protobuf_message_oneof_field_encoder {
         $crate::field::MessageFieldEncoder::new($num, $field)
     };
     ($num:expr, $field:expr,unsized_message) => {
-        $crate::field::MessageFieldEncoder::new(
-            $num,
-            ::bytecodec::EncodeExt::pre_encode($field),
-        )
+        $crate::field::MessageFieldEncoder::new($num, ::bytecodec::EncodeExt::pre_encode($field))
     };
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::{DecodeExt, EncodeExt};
 
     use field::branch::*;

@@ -612,7 +612,7 @@ where
 {}
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::io::IoEncodeExt;
     use bytecodec::EncodeExt;
 

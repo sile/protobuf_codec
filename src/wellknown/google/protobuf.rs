@@ -305,7 +305,7 @@ impl SizedEncode for StdDurationEncoder {
 impl MessageEncode for StdDurationEncoder {}
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::DecodeExt;
 
     use super::*;
