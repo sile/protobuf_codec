@@ -150,7 +150,8 @@ impl<E, V> FieldEncode for Repeated<E, V>
 where
     E: RequiredFieldEncode,
     V: IntoIterator<Item = E::Item>,
-{}
+{
+}
 
 /// Decoder for packed repeated fields.
 ///
@@ -490,7 +491,8 @@ where
     F: Copy + Into<FieldNum>,
     E: NumericValueEncode,
     V: IntoIterator<Item = E::Item>,
-{}
+{
+}
 
 type ScalarEntryEncoder<K, V> = MessageEncoder<Fields<(FieldEncoder<F1, K>, FieldEncoder<F2, V>)>>;
 type MessageEntryEncoder<K, V> =
@@ -550,7 +552,8 @@ where
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + ValueEncode,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-{}
+{
+}
 impl<F, K, V, M: IntoIterator> fmt::Debug for MapFieldEncoder<F, K, V, M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapFieldEncoder {{ .. }}")
@@ -611,7 +614,8 @@ where
     K: SizedEncode + MapKeyEncode,
     V: SizedEncode + MessageEncode,
     M: IntoIterator<Item = (K::Item, V::Item)>,
-{}
+{
+}
 impl<F, K, V, M: IntoIterator> fmt::Debug for MapMessageFieldEncoder<F, K, V, M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MapMessageFieldEncoder {{ .. }}")

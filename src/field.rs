@@ -377,7 +377,8 @@ impl<E> FieldEncode for MaybeDefault<E>
 where
     E: RequiredFieldEncode,
     E::Item: Default + PartialEq,
-{}
+{
+}
 
 /// Decoder for unknown fields.
 ///
@@ -523,12 +524,14 @@ impl<F, E> FieldEncode for MessageFieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: MessageEncode + SizedEncode,
-{}
+{
+}
 impl<F, E> RequiredFieldEncode for MessageFieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: MessageEncode + SizedEncode,
-{}
+{
+}
 
 /// Encoder for required scalar fields.
 #[derive(Debug, Default)]
@@ -604,12 +607,14 @@ impl<F, E> FieldEncode for FieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: ValueEncode,
-{}
+{
+}
 impl<F, E> RequiredFieldEncode for FieldEncoder<F, E>
 where
     F: Copy + Into<FieldNum>,
     E: ValueEncode,
-{}
+{
+}
 
 #[cfg(test)]
 mod tests {
