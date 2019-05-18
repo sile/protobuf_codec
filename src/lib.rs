@@ -3,8 +3,8 @@
 //! # Limitation
 //!
 //! The current version does not support to merge duplicate messages.
-//! Alghtough it is required by [The guide][encoding],
-//! `protobuf_codec` simply select the last message instance of the same singular field.
+//! Although it is required by [the guide][encoding],
+//! `protobuf_codec` simply selects the last message instance of the same singular field.
 //!
 //! # Examples
 //!
