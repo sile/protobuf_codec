@@ -3,7 +3,7 @@
 //! See also [google/protobuf].
 //!
 //! [google/protobuf]: https://github.com/google/protobuf/tree/master/src/google/protobuf
-#![cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
+#![allow(clippy::type_complexity)]
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 use std::time::Duration;
 

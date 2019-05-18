@@ -116,7 +116,7 @@ where
         let mut offset = 0;
         while offset < buf.len() {
             if self.inner.is_idle() {
-                if let Some(item) = self.value_iter.as_mut().and_then(|x| x.next()) {
+                if let Some(item) = self.value_iter.as_mut().and_then(Iterator::next) {
                     track!(self.inner.start_encoding(item))?;
                 } else {
                     self.value_iter = None;

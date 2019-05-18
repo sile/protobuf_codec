@@ -3,7 +3,7 @@
 //! See also [protobuf_codec/protobuf/trackable.proto].
 //!
 //! [protobuf_codec/protobuf/trackable.proto]: https://github.com/sile/protobuf_codec/blob/master/protobuf/trackable.proto
-#![cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
+#![allow(clippy::type_complexity)]
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
 use std::error::Error;
 use trackable::error::{ErrorKindExt, TrackableError};
@@ -103,8 +103,8 @@ impl Encode for ErrorEncoder {
     fn start_encoding(&mut self, item: Self::Item) -> Result<()> {
         let item = (
             item.kind().clone(),
-            item.cause()
-                .map(|e| e.to_string())
+            item.source()
+                .map(ToString::to_string)
                 .unwrap_or_else(String::new),
             item.history()
                 .map(|h| h.events().to_owned())

@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "cargo-clippy", allow(single_match, block_in_if_condition_stmt))]
+#![allow(clippy::single_match, clippy::block_in_if_condition_stmt)]
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 
 use field::{FieldDecode, FieldEncode, RequiredFieldDecode, RequiredFieldEncode};
