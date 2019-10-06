@@ -88,15 +88,14 @@ mod value;
 
 #[cfg(test)]
 mod tests {
+    use crate::field::branch::*;
+    use crate::field::num::*;
+    use crate::field::*;
+    use crate::message::*;
+    use crate::scalar::*;
     use bytecodec::combinator::PreEncode;
     use bytecodec::io::{IoDecodeExt, IoEncodeExt};
     use bytecodec::{DecodeExt, EncodeExt, SizedEncode};
-
-    use field::branch::*;
-    use field::num::*;
-    use field::*;
-    use message::*;
-    use scalar::*;
 
     macro_rules! assert_decode {
         ($decoder:ty, $value:expr, $bytes:expr) => {

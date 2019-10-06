@@ -1,20 +1,17 @@
-use bytecodec::combinator::Collect;
-use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result, SizedEncode};
-use std::fmt;
-use std::iter;
-use std::mem;
-
-use field::num::{FieldNum, F1, F2};
-use field::{
+use crate::field::num::{FieldNum, F1, F2};
+use crate::field::{
     FieldDecode, FieldDecoder, FieldEncode, FieldEncoder, Fields, MessageFieldDecoder,
     MessageFieldEncoder, RequiredFieldDecode, RequiredFieldEncode,
 };
-use message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
-use scalar::BytesEncoder;
-use value::{
+use crate::message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
+use crate::scalar::BytesEncoder;
+use crate::value::{
     MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode, ValueEncode,
 };
-use wire::{LengthDelimitedDecoder, Tag, TagEncoder, WireType};
+use crate::wire::{LengthDelimitedDecoder, Tag, TagEncoder, WireType};
+use bytecodec::combinator::Collect;
+use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result, SizedEncode};
+use std::{fmt, iter, mem};
 
 /// Decoder and encoder for repeated fields.
 #[derive(Debug)]

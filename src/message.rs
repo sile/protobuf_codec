@@ -1,11 +1,10 @@
 //! Encoders, decoders and traits for messages.
+use crate::field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
+use crate::value::{ValueDecode, ValueEncode};
+use crate::wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagDecoder, WireType};
 use bytecodec::combinator::{Map, MapErr, MapFrom, PreEncode, TryMap, TryMapFrom};
 use bytecodec::{ByteCount, Decode, Encode, Eos, Error, ErrorKind, Result, SizedEncode};
 use std;
-
-use field::{FieldDecode, FieldEncode, UnknownFieldDecoder};
-use value::{ValueDecode, ValueEncode};
-use wire::{LengthDelimitedDecoder, LengthDelimitedEncoder, TagDecoder, WireType};
 
 /// This trait allows for decoding messages.
 pub trait MessageDecode: Decode {}

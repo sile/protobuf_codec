@@ -4,18 +4,17 @@
 //!
 //! [protobuf_codec/protobuf/trackable.proto]: https://github.com/sile/protobuf_codec/blob/master/protobuf/trackable.proto
 #![allow(clippy::type_complexity)]
+use crate::field::num::{F1, F2, F3, F4};
+use crate::field::{
+    FieldDecoder, FieldEncoder, Fields, MaybeDefault, MessageFieldDecoder, MessageFieldEncoder,
+    Repeated,
+};
+use crate::message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
+use crate::scalar::{StringDecoder, StringEncoder, Uint32Decoder, Uint32Encoder};
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
 use std::error::Error;
 use trackable::error::{ErrorKindExt, TrackableError};
 use trackable::{Location, Trackable};
-
-use field::num::{F1, F2, F3, F4};
-use field::{
-    FieldDecoder, FieldEncoder, Fields, MaybeDefault, MessageFieldDecoder, MessageFieldEncoder,
-    Repeated,
-};
-use message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
-use scalar::{StringDecoder, StringEncoder, Uint32Decoder, Uint32Encoder};
 
 /// Decoder for [TrackableError].
 ///

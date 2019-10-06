@@ -1,34 +1,35 @@
 //! Encoders, decoders and related components for message fields.
-use bytecodec::bytes::CopyableBytesDecoder;
-use bytecodec::padding::PaddingDecoder;
-use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
-pub use fields::Fields;
-pub use oneof::Oneof;
-pub use repeated_field::{
+use crate::field_num::FieldNum;
+pub use crate::fields::Fields;
+use crate::message::{
+    EmbeddedMessageDecoder, EmbeddedMessageEncoder, MessageDecode, MessageEncode,
+};
+pub use crate::oneof::Oneof;
+pub use crate::repeated_field::{
     MapFieldDecoder, MapFieldEncoder, MapMessageFieldDecoder, MapMessageFieldEncoder,
     PackedFieldDecoder, PackedFieldEncoder, Repeated,
 };
+use crate::value::{ValueDecode, ValueEncode};
+use crate::wire::{LengthDelimitedDecoder, Tag, TagEncoder, VarintDecoder, WireType};
+use bytecodec::bytes::CopyableBytesDecoder;
+use bytecodec::padding::PaddingDecoder;
+use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 
 pub mod num {
     //! Field number.
 
-    pub use field_num::*;
+    pub use crate::field_num::*;
 }
 pub mod branch {
     //! Values for `Oneof` fields.
 
-    pub use oneof::{Branch2, Branch3, Branch4, Branch5, Branch6, Branch7, Branch8};
+    pub use crate::oneof::{Branch2, Branch3, Branch4, Branch5, Branch6, Branch7, Branch8};
 }
 pub mod value {
     //! Traits for representing encoders and decoders of field values.
 
-    pub use value::*;
+    pub use crate::value::*;
 }
-
-use field_num::FieldNum;
-use message::{EmbeddedMessageDecoder, EmbeddedMessageEncoder, MessageDecode, MessageEncode};
-use value::{ValueDecode, ValueEncode};
-use wire::{LengthDelimitedDecoder, Tag, TagEncoder, VarintDecoder, WireType};
 
 /// This trait allows for decoding message fields.
 pub trait FieldDecode: Decode {
@@ -618,11 +619,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::scalar::Fixed32Encoder;
     use bytecodec::io::IoEncodeExt;
     use bytecodec::EncodeExt;
-
-    use super::*;
-    use scalar::Fixed32Encoder;
 
     macro_rules! assert_encode {
         ($encoder:ty, $value:expr, $bytes:expr) => {

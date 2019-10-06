@@ -245,11 +245,10 @@ macro_rules! protobuf_message_oneof_field_encoder {
 
 #[cfg(test)]
 mod tests {
+    use crate::field::branch::*;
+    use crate::field::num::*;
+    use crate::scalar::*;
     use bytecodec::{DecodeExt, EncodeExt};
-
-    use field::branch::*;
-    use field::num::*;
-    use scalar::*;
 
     #[test]
     fn decoder_macro_works() {

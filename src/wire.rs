@@ -3,11 +3,10 @@
 //! Since this a low-level module, developers usually do not use it directly.
 //!
 //! [binary wire format]: https://developers.google.com/protocol-buffers/docs/encoding
+use crate::field::num::FieldNum;
 use bytecodec::bytes::BytesEncoder;
 use bytecodec::combinator::{Length, Peekable};
 use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result, SizedEncode};
-
-use field::num::FieldNum;
 
 /// Field tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

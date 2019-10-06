@@ -1,8 +1,7 @@
 #![allow(clippy::single_match, clippy::block_in_if_condition_stmt)]
+use crate::field::{FieldDecode, FieldEncode, RequiredFieldDecode, RequiredFieldEncode};
+use crate::wire::Tag;
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
-
-use field::{FieldDecode, FieldEncode, RequiredFieldDecode, RequiredFieldEncode};
-use wire::Tag;
 
 /// Value of `Oneof` that has 2-fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

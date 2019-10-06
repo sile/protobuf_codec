@@ -1,8 +1,7 @@
 #![allow(clippy::block_in_if_condition_stmt)]
+use crate::field::{FieldDecode, FieldEncode};
+use crate::wire::Tag;
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
-
-use field::{FieldDecode, FieldEncode};
-use wire::Tag;
 
 /// Decoder and encoder for multiple fields.
 #[derive(Debug, Default)]

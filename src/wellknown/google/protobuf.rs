@@ -4,13 +4,12 @@
 //!
 //! [google/protobuf]: https://github.com/google/protobuf/tree/master/src/google/protobuf
 #![allow(clippy::type_complexity)]
+use crate::field::num::{F1, F2};
+use crate::field::{FieldDecoder, FieldEncoder, Fields, MaybeDefault};
+use crate::message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
+use crate::scalar::{Int32Decoder, Int32Encoder, Int64Decoder, Int64Encoder};
 use bytecodec::{ByteCount, Decode, Encode, Eos, ErrorKind, Result, SizedEncode};
 use std::time::Duration;
-
-use field::num::{F1, F2};
-use field::{FieldDecoder, FieldEncoder, Fields, MaybeDefault};
-use message::{MessageDecode, MessageDecoder, MessageEncode, MessageEncoder};
-use scalar::{Int32Decoder, Int32Encoder, Int64Decoder, Int64Encoder};
 
 /// Decoder for [Empty] Message.
 ///
@@ -306,11 +305,10 @@ impl MessageEncode for StdDurationEncoder {}
 
 #[cfg(test)]
 mod tests {
-    use bytecodec::DecodeExt;
-
     use super::*;
-    use field::{num::F2, MessageFieldDecoder};
-    use message::MessageDecoder;
+    use crate::field::{num::F2, MessageFieldDecoder};
+    use crate::message::MessageDecoder;
+    use bytecodec::DecodeExt;
 
     #[test]
     fn duration_decoder_works() {

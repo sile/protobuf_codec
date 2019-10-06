@@ -1,6 +1,12 @@
 //! Encoders and decoders for [scalar] values.
 //!
 //! [scalar]: https://developers.google.com/protocol-buffers/docs/proto3#scalar
+use crate::value::{
+    MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode, ValueEncode,
+};
+use crate::wire::{
+    LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType,
+};
 use bytecodec::bytes::{
     BytesEncoder as BytesEncoderInner, RemainingBytesDecoder, Utf8Decoder, Utf8Encoder,
 };
@@ -9,13 +15,6 @@ use bytecodec::fixnum::{
     I64leDecoder, I64leEncoder, U32leDecoder, U32leEncoder, U64leDecoder, U64leEncoder,
 };
 use bytecodec::{ByteCount, Decode, Encode, Eos, Result, SizedEncode};
-
-use value::{
-    MapKeyDecode, MapKeyEncode, NumericValueDecode, NumericValueEncode, ValueDecode, ValueEncode,
-};
-use wire::{
-    LengthDelimitedDecoder, LengthDelimitedEncoder, VarintDecoder, VarintEncoder, WireType,
-};
 
 macro_rules! impl_newtype_decode {
     ($decoder:ty, $item:ty, $wire:ident) => {

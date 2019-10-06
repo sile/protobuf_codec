@@ -1,8 +1,7 @@
+use crate::wire::WireType;
 use bytecodec::combinator::{Map, MapErr, MapFrom, Peekable, TryMap, TryMapFrom};
 use bytecodec::{Decode, Encode, Error, SizedEncode};
 use std;
-
-use wire::WireType;
 
 /// This trait allows for decoding field values.
 ///
