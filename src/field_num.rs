@@ -19,7 +19,7 @@ impl FieldNum {
     /// [the language guide]: https://developers.google.com/protocol-buffers/docs/proto3
     pub fn new(n: u32) -> Result<Self> {
         track_assert_ne!(n, 0, ErrorKind::InvalidInput);
-        track_assert!(n < (2 << 29), ErrorKind::InvalidInput; n);
+        track_assert!(n < (1 << 29), ErrorKind::InvalidInput; n);
         track_assert!(!(19_000 <= n && n < 20_000), ErrorKind::InvalidInput; n);
         Ok(FieldNum(n))
     }
